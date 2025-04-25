@@ -1,67 +1,60 @@
 buildscript {
+    ext {
+        agp_version = '8.9.2'
+    }
     repositories {
         mavenCentral()
         google()
-        jcenter()
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:3.5.3'
+        classpath "com.android.tools.build:gradle:$agp_version"
     }
 }
 
-wrapper {
-    gradleVersion = '5.6'
-}
+//wrapper {
+//    gradleVersion = '5.6'
+//}
 
 apply plugin: 'com.android.library'
 
 
 android {
-    compileSdkVersion 27
-    buildToolsVersion '28.0.3'
+    compileSdk 35
 
     defaultConfig {
         minSdkVersion 9
         targetSdkVersion 27
-        versionCode 1
-        versionName "1.0"
     }
     buildTypes {
         release {
             minifyEnabled false
         }
     }
-      lintOptions {
-          abortOnError false
-      }
-
+    lint {
+        abortOnError false
+    }
+    namespace = "com.jjoe64.graphview"
 }
 
 dependencies {
-    implementation 'androidx.core:core:1.0.0-beta01'
+    implementation libs.androidx.core
 }
 
 
 //this is used to generate .jar files and push to maven repo
 // This is the actual solution, as in http://stackoverflow.com/a/19037807/1002054
-task clearJar(type: Delete) {
-    delete 'build/outputs/myCompiledLibrary.jar'
-}
-
-task makeJar(type: Copy) {
-    from('build/intermediates/bundles/release/')
-    into('build/outputs/')
-    include('classes.jar')
-    rename ('classes.jar', 'myCompiledLibrary.jar')
-}
-
-makeJar.dependsOn(clearJar, build)
-
-
-apply from: './maven_push.gradle'
-
-repositories {
-    google()
-    mavenCentral()
-    jcenter()
-}
+//task clearJar(type: Delete) {
+//    delete 'build/outputs/myCompiledLibrary.jar'
+//}
+//
+//task makeJar(type: Copy) {
+//    from('build/intermediates/bundles/release/')
+//    into('build/outputs/')
+//    include('classes.jar')
+//    rename ('classes.jar', 'myCompiledLibrary.jar')
+//}
+//
+//makeJar.dependsOn(clearJar, build)
+//
+//
+//apply from: './maven_push.gradle'
