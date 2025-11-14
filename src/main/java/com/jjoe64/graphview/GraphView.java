@@ -34,13 +34,14 @@ import com.jjoe64.graphview.series.BaseSeries;
 import com.jjoe64.graphview.series.Series;
 
 import java.io.ByteArrayOutputStream;
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
 /**
  * @author jjoe64
  */
-public class GraphView extends View {
+public class GraphView extends View implements Serializable {
     /**
      * Class to wrap style options that are general
      * to graphs.
