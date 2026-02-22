@@ -34,11 +34,11 @@ if (isReleaseBuild()) {
             : "https://oss.sonatype.org/content/repositories/snapshots/"
 }
 
-def getRepositoryUsername() {
+static def getRepositoryUsername() {
     return ""
 }
 
-def getRepositoryPassword() {
+static def getRepositoryPassword() {
     return ""
 }
 
@@ -97,17 +97,17 @@ afterEvaluate { project ->
         sign configurations.archives
     }
 
-    task androidJavadocs(type: Javadoc) {
+    tasks.register('androidJavadocs', Javadoc) {
         source = android.sourceSets.main.java.sourceFiles
     }
 
-    task androidJavadocsJar(type: Jar) {
+    tasks.register('androidJavadocsJar', Jar) {
         classifier = 'javadoc'
         //basename = artifact_id
         from androidJavadocs.destinationDir
     }
 
-    task androidSourcesJar(type: Jar) {
+    tasks.register('androidSourcesJar', Jar) {
         classifier = 'sources'
         //basename = artifact_id
         from android.sourceSets.main.java.sourceFiles
