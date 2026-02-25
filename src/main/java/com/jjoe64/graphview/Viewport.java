@@ -1350,4 +1350,11 @@ public class Viewport {
     public void setMinimalViewport(double minX, double maxX, double minY, double maxY) {
        mMinimalViewport.set(minX, maxY, maxX, minY);
     }
+
+    public void zoomToFit() {
+        setMinX(0.0);
+        setMaxX(getMaxX(true));
+        setMinY(0.0);
+        setMaxY(getMaxY(true));
+    }
 }
