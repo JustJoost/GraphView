@@ -88,6 +88,10 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      */
     protected OnDataPointTapListener mOnDataPointTapListener;
 
+    protected OnDataPointSelectedListener mOnDataPointSelectedListener;
+
+    private E mSelectedDataPoint;
+
     /**
      * stores the graphviews where this series is used.
      * Can be more than one.
@@ -287,8 +291,14 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      *
      * @param l listener
      */
+    @Override
     public void setOnDataPointTapListener(OnDataPointTapListener l) {
         this.mOnDataPointTapListener = l;
+    }
+
+    @Override
+    public void setOnDataPointSelectedListener(OnDataPointSelectedListener l) {
+        this.mOnDataPointSelectedListener = l;
     }
 
     /**
@@ -300,10 +310,13 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      */
     @Override
     public void onTap(float x, float y) {
-        if (mOnDataPointTapListener != null) {
-            E p = findDataPoint(x, y);
-            if (p != null) {
-                mOnDataPointTapListener.onTap(this, p);
+        E p = findDataPoint(x, y);
+        if (p != null) {
+            if (mOnDataPointTapListener != null) mOnDataPointTapListener.onTap(this, p);
+            if (p != mSelectedDataPoint) {
+                mSelectedDataPoint = p;
+                if (mOnDataPointSelectedListener != null)
+                    mOnDataPointSelectedListener.onSelection(this, p);
             }
         }
     }

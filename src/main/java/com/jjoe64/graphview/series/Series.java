@@ -100,6 +100,14 @@ public interface Series<E extends DataPointInterface> {
     public void setOnDataPointTapListener(OnDataPointTapListener l);
 
     /**
+     * set a listener selection of a data point.
+     *
+     * @param l listener
+     */
+    public void setOnDataPointSelectedListener(OnDataPointSelectedListener l);
+
+
+    /**
      * called by the tap detector in order to trigger
      * the on tap on datapoint event.
      *
