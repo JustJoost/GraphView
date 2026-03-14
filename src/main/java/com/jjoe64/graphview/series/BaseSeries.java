@@ -18,18 +18,17 @@ package com.jjoe64.graphview.series;
 
 import android.graphics.Canvas;
 import android.graphics.PointF;
-import android.util.Log;
 
 import com.jjoe64.graphview.GraphView;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Set;
 
 /**
  * Basis implementation for series.
@@ -58,9 +57,9 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      * Key => x/y pixel
      * Value => Plotted Datapoint
      *
-     * will be filled while drawing via {@link #registerDataPoint(float, float, DataPointInterface)}
+     * will be filled while drawing via {@link #regDataPointLocInView(float, float, DataPointInterface)}
      */
-    private Map<PointF, E> mDataPoints = new HashMap<PointF, E>();
+    private final Map<PointF, E> mDataPointsLocInView = new HashMap<PointF, E>();
 
     /**
      * title for this series that can be displayed
@@ -93,7 +92,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      * stores the graphviews where this series is used.
      * Can be more than one.
      */
-    private List<WeakReference<GraphView>> mGraphViews;
+    private final List<WeakReference<GraphView>> mGraphViews;
     private Boolean mIsCursorModeCache;
 
     /**
@@ -111,9 +110,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      */
     public BaseSeries(E[] data) {
         mGraphViews = new ArrayList<>();
-        for (E d : data) {
-            mData.add(d);
-        }
+        mData.addAll(Arrays.asList(data));
         checkValueOrder(null);
     }
 
@@ -185,7 +182,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
             return mData.iterator();
         } else {
             return new Iterator<E>() {
-                Iterator<E> org = mData.iterator();
+                final Iterator<E> org = mData.iterator();
                 E nextValue = null;
                 E nextNextValue = null;
                 boolean plusOne = true;
@@ -279,7 +276,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      * plotting (depends on the series implementation) and
      * is used in the legend.
      *
-     * @param mColor
+     * @param mColor color of the series
      */
     public void setColor(int mColor) {
         this.mColor = mColor;
@@ -322,13 +319,11 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     protected E findDataPoint(float x, float y) {
         float shortestDistance = Float.NaN;
         E shortest = null;
-        for (Map.Entry<PointF, E> entry : mDataPoints.entrySet()) {
-            float x1 = entry.getKey().x;
-            float y1 = entry.getKey().y;
-            float x2 = x;
-            float y2 = y;
+        for (Map.Entry<PointF, E> entry : mDataPointsLocInView.entrySet()) {
+            float xDiff = entry.getKey().x - x;
+            float yDiff = entry.getKey().y - y;
 
-            float distance = (float) Math.sqrt((x1-x2)*(x1-x2) + (y1-y2)*(y1-y2));
+            float distance = (float) Math.sqrt(xDiff*xDiff + yDiff*yDiff);
             if (shortest == null || distance < shortestDistance) {
                 shortestDistance = distance;
                 shortest = entry.getValue();
@@ -345,11 +340,10 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     public E findDataPointAtX(float x) {
         float shortestDistance = Float.NaN;
         E shortest = null;
-        for (Map.Entry<PointF, E> entry : mDataPoints.entrySet()) {
-            float x1 = entry.getKey().x;
-            float x2 = x;
+        for (Map.Entry<PointF, E> entry : mDataPointsLocInView.entrySet()) {
+            float xDiff = entry.getKey().x - x;
 
-            float distance = Math.abs(x1 - x2);
+            float distance = Math.abs(xDiff);
             if (shortest == null || distance < shortestDistance) {
                 shortestDistance = distance;
                 shortest = entry.getValue();
@@ -370,11 +364,11 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      * @param y pixel
      * @param dp the data point to save
      */
-    protected void registerDataPoint(float x, float y, E dp) {
+    protected void regDataPointLocInView(float x, float y, E dp) {
         // performance
         // TODO maybe invalidate after setting the listener
         if (mOnDataPointTapListener != null || isCursorMode()) {
-            mDataPoints.put(new PointF(x, y), dp);
+            mDataPointsLocInView.put(new PointF(x, y), dp);
         }
     }
 
@@ -394,7 +388,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      * clears the cached data point coordinates
      */
     protected void resetDataPoints() {
-        mDataPoints.clear();
+        mDataPointsLocInView.clear();
     }
 
     /**
@@ -406,9 +400,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      */
     public void resetData(E[] data) {
         mData.clear();
-        for (E d : data) {
-            mData.add(d);
-        }
+        mData.addAll(Arrays.asList(data));
         checkValueOrder(null);
 
         mHighestYCache = mLowestYCache = Double.NaN;
@@ -527,7 +519,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
                 double lx = mData.get(0).getX();
 
                 for (int i = 1; i < mData.size(); i++) {
-                    if (mData.get(i).getX() != Double.NaN) {
+                    if (!Double.isNaN(mData.get(i).getX())) {
                         if (lx > mData.get(i).getX()) {
                             throw new IllegalArgumentException("The order of the values is not correct. X-Values have to be ordered ASC. First the lowest x value and at least the highest x value.");
                         }

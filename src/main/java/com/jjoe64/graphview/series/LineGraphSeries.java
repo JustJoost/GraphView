@@ -390,7 +390,7 @@ public class LineGraphSeries<E extends DataPointInterface> extends BaseSeries<E>
                             canvas.drawCircle(endXAnimated, endY, mStyles.dataPointsRadius, paint);
                             paint.setStyle(prevStyle);
                         }
-                        registerDataPoint(endX, endY, value);
+                        regDataPointLocInView(endX, endY, value);
                     }
 
                     if (mDrawAsPath) {
@@ -475,7 +475,7 @@ public class LineGraphSeries<E extends DataPointInterface> extends BaseSeries<E>
                     paint.setStyle(Paint.Style.FILL);
                     canvas.drawCircle(first_X, first_Y, mStyles.dataPointsRadius, paint);
                     paint.setStyle(prevStyle);
-                    registerDataPoint(first_X, first_Y, value);
+                    regDataPointLocInView(first_X, first_Y, value);
                 }
             }
             lastEndY = orgY;

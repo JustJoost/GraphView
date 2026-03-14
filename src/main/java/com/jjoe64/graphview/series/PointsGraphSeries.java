@@ -17,7 +17,6 @@
 package com.jjoe64.graphview.series;
 
 import android.graphics.Canvas;
-import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
 import android.graphics.Point;
@@ -215,7 +214,7 @@ public class PointsGraphSeries<E extends DataPointInterface> extends BaseSeries<
             
             float endX = (float) x + (graphLeft + 1);
             float endY = (float) (graphTop - y) + graphHeight;
-            registerDataPoint(endX, endY, value);
+            regDataPointLocInView(endX, endY, value);
 
             // draw data point
             if (!overdraw) {
