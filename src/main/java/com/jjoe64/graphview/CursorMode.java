@@ -32,6 +32,12 @@ public class CursorMode {
         public int backgroundColor;
         public int margin;
         public int textColor;
+        public CoordinatesDisplayType coordinatesDisplayType;
+    }
+
+    public enum CoordinatesDisplayType {
+        LEGEND,
+        AXIS_LABELS
     }
 
     protected final Paint mPaintLine;
@@ -69,6 +75,7 @@ public class CursorMode {
         mStyles.width = 0;
         mStyles.backgroundColor = Color.argb(180, 100, 100, 100);
         mStyles.margin = (int) (mStyles.textSize);
+        mStyles.coordinatesDisplayType = CoordinatesDisplayType.LEGEND;
 
         // get matching styles from theme
         TypedValue typedValue = new TypedValue();
@@ -77,8 +84,7 @@ public class CursorMode {
         int color1;
 
         try {
-            TypedArray array = mGraphView.getContext().obtainStyledAttributes(typedValue.data, new int[]{
-                    android.R.attr.textColorPrimary});
+            TypedArray array = mGraphView.getContext().obtainStyledAttributes(typedValue.data, new int[]{android.R.attr.textColorPrimary});
             color1 = array.getColor(0, Color.BLACK);
             array.recycle();
         } catch (Exception e) {
@@ -121,7 +127,10 @@ public class CursorMode {
         }
 
         if (!mCurrentSelection.isEmpty()) {
-            drawLegend(canvas);
+            switch (mStyles.coordinatesDisplayType) {
+                case LEGEND:
+                    drawLegend(canvas);
+            }
         }
     }
 
@@ -139,7 +148,7 @@ public class CursorMode {
         mTextPaint.setTextSize(mStyles.textSize);
         mTextPaint.setColor(mStyles.textColor);
 
-        int shapeSize = (int) (mStyles.textSize*0.8d);
+        int shapeSize = (int) (mStyles.textSize * 0.8d);
 
         // width
         int legendWidth = mStyles.width;
@@ -157,7 +166,7 @@ public class CursorMode {
                 if (legendWidth == 0) legendWidth = 1;
 
                 // add shape size
-                legendWidth += shapeSize+mStyles.padding*2 + mStyles.spacing;
+                legendWidth += shapeSize + mStyles.padding * 2 + mStyles.spacing;
                 cachedLegendWidth = legendWidth;
             }
         }
@@ -168,7 +177,7 @@ public class CursorMode {
         }
 
         // rect
-        float legendHeight = (mStyles.textSize+mStyles.spacing) * (mCurrentSelection.size() + 1) -mStyles.spacing;
+        float legendHeight = (mStyles.textSize + mStyles.spacing) * (mCurrentSelection.size() + 1) - mStyles.spacing;
 
         float legendPosY = mPosY - legendHeight - 4.5f * mStyles.textSize;
         if (legendPosY < 0) {
@@ -180,21 +189,21 @@ public class CursorMode {
         lLeft = legendPosX;
         lTop = legendPosY;
 
-        float lRight = lLeft+legendWidth;
-        float lBottom = lTop+legendHeight+2*mStyles.padding;
+        float lRight = lLeft + legendWidth;
+        float lBottom = lTop + legendHeight + 2 * mStyles.padding;
         mRectPaint.setColor(mStyles.backgroundColor);
         canvas.drawRoundRect(new RectF(lLeft, lTop, lRight, lBottom), 8, 8, mRectPaint);
 
         mTextPaint.setFakeBoldText(true);
-        canvas.drawText(mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionX, true), lLeft+mStyles.padding, lTop+mStyles.padding/2+mStyles.textSize, mTextPaint);
+        canvas.drawText(mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionX, true), lLeft + mStyles.padding, lTop + mStyles.padding / 2 + mStyles.textSize, mTextPaint);
 
         mTextPaint.setFakeBoldText(false);
 
-        int i=1;
+        int i = 1;
         for (Map.Entry<BaseSeries, DataPointInterface> entry : mCurrentSelection.entrySet()) {
             mRectPaint.setColor(entry.getKey().getColor());
-            canvas.drawRect(new RectF(lLeft+mStyles.padding, lTop+mStyles.padding+(i*(mStyles.textSize+mStyles.spacing)), lLeft+mStyles.padding+shapeSize, lTop+mStyles.padding+(i*(mStyles.textSize+mStyles.spacing))+shapeSize), mRectPaint);
-            canvas.drawText(getTextForSeries(entry.getKey(), entry.getValue()), lLeft+mStyles.padding+shapeSize+mStyles.spacing, lTop+mStyles.padding/2+mStyles.textSize+(i*(mStyles.textSize+mStyles.spacing)), mTextPaint);
+            canvas.drawRect(new RectF(lLeft + mStyles.padding, lTop + mStyles.padding + (i * (mStyles.textSize + mStyles.spacing)), lLeft + mStyles.padding + shapeSize, lTop + mStyles.padding + (i * (mStyles.textSize + mStyles.spacing)) + shapeSize), mRectPaint);
+            canvas.drawText(getTextForSeries(entry.getKey(), entry.getValue()), lLeft + mStyles.padding + shapeSize + mStyles.spacing, lTop + mStyles.padding / 2 + mStyles.textSize + (i * (mStyles.textSize + mStyles.spacing)), mTextPaint);
             i++;
         }
     }
@@ -250,5 +259,9 @@ public class CursorMode {
 
     public void setWidth(int s) {
         mStyles.width = s;
+    }
+
+    public void setCoordinatesDisplayType(CoordinatesDisplayType type) {
+        mStyles.coordinatesDisplayType = type;
     }
 }
