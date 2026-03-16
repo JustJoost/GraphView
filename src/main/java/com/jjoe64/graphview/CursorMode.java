@@ -36,8 +36,7 @@ public class CursorMode {
     }
 
     public enum CoordinatesDisplayType {
-        LEGEND,
-        AXIS_LABELS
+        LEGEND, AXIS_LABELS
     }
 
     protected final Paint mPaintLine;
@@ -49,6 +48,7 @@ public class CursorMode {
     protected final Paint mRectPaint;
     protected final Paint mTextPaint;
     protected double mCurrentSelectionX;
+    protected double mCurrentSelectionY;
     protected Styles mStyles;
     protected int cachedLegendWidth;
 
@@ -130,12 +130,16 @@ public class CursorMode {
             switch (mStyles.coordinatesDisplayType) {
                 case LEGEND:
                     drawLegend(canvas);
+                    break;
+                case AXIS_LABELS:
+                    drawLabels(canvas);
+                    break;
             }
         }
     }
 
     protected String getTextForSeries(Series s, DataPointInterface value) {
-        StringBuffer txt = new StringBuffer();
+        StringBuilder txt = new StringBuilder();
         if (s.getTitle() != null) {
             txt.append(s.getTitle());
             txt.append(": ");
@@ -208,6 +212,21 @@ public class CursorMode {
         }
     }
 
+    protected void drawLabels(Canvas canvas) {
+        mTextPaint.setTextSize(mStyles.textSize);
+        float graphLeft = mGraphView.getGraphContentLeft();
+        float graphHeight = mGraphView.getGraphContentHeight();
+
+        for (Map.Entry<BaseSeries, DataPointInterface> entry : mCurrentSelection.entrySet()) {
+            mTextPaint.setColor(entry.getKey().getColor());
+
+            float xInView = mGraphView.getDataPointXInView(entry.getValue(), entry.getKey(), false);
+            float yInView = mGraphView.getDataPointYInView(entry.getValue(), entry.getKey(), false);
+            canvas.drawText(mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionX, true), xInView, graphHeight, mTextPaint);
+            canvas.drawText(mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionY, false), graphLeft + mStyles.padding, yInView, mTextPaint);
+        }
+    }
+
     public boolean onUp(MotionEvent event) {
         mCursorVisible = false;
         findCurrentDataPoint();
@@ -216,20 +235,16 @@ public class CursorMode {
     }
 
     private void findCurrentDataPoint() {
-        double selX = 0;
         mCurrentSelection.clear();
         for (Series series : mGraphView.getSeries()) {
             if (series instanceof BaseSeries) {
                 DataPointInterface p = ((BaseSeries) series).findDataPointAtX(mPosX);
                 if (p != null) {
-                    selX = p.getX();
+                    mCurrentSelectionX = p.getX();
+                    mCurrentSelectionY = p.getY();
                     mCurrentSelection.put((BaseSeries) series, p);
                 }
             }
-        }
-
-        if (!mCurrentSelection.isEmpty()) {
-            mCurrentSelectionX = selX;
         }
     }
 

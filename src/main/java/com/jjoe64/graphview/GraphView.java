@@ -31,6 +31,7 @@ import android.view.MotionEvent;
 import android.view.View;
 
 import com.jjoe64.graphview.series.BaseSeries;
+import com.jjoe64.graphview.series.DataPointInterface;
 import com.jjoe64.graphview.series.Series;
 
 import java.io.ByteArrayOutputStream;
@@ -436,6 +437,41 @@ public class GraphView extends View implements Serializable {
             graphwidth -= mSecondScale.getVerticalAxisTitleTextSize();
         }
         return graphwidth;
+    }
+
+    public float getDataPointXInView(DataPointInterface dp, Series<?> series, Boolean forceReCalc) {
+        // TODO: if forceReCalc is false, look up in cache
+        float graphWidth = getGraphContentWidth();
+        float graphLeft = getGraphContentLeft();
+
+        // Bounds of x-axis values
+        double maxX = mViewport.getMaxX(false);
+        double minX = mViewport.getMinX(false);
+
+        double x = graphWidth * (dp.getX() - minX) / (maxX - minX);
+
+        return (float) x + (graphLeft + 1);
+    }
+
+    public float getDataPointYInView(DataPointInterface dp, Series<?> series, Boolean forceReCalc) {
+        // TODO: if forceReCalc is false, look up in cache
+        float graphHeight = getGraphContentHeight();
+        float graphTop = getGraphContentTop();
+
+        // Bounds of y-axis values
+        double maxY;
+        double minY;
+        if (mSecondScale != null) {
+            maxY = mSecondScale.getMaxY(false);
+            minY = mSecondScale.getMinY(false);
+        } else {
+            maxY = mViewport.getMaxY(false);
+            minY = mViewport.getMinY(false);
+        }
+
+        double y = graphHeight * (dp.getY() - minY) / (maxY - minY);
+
+        return (float) (graphTop - y) + graphHeight;
     }
 
     /**
