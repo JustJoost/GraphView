@@ -216,12 +216,28 @@ public class CursorMode {
         mTextPaint.setTextSize(mStyles.textSize);
         float graphLeft = mGraphView.getGraphContentLeft();
         float graphHeight = mGraphView.getGraphContentHeight();
+        float graphWidth = mGraphView.getGraphContentWidth();
 
         for (Map.Entry<BaseSeries, DataPointInterface> entry : mCurrentSelection.entrySet()) {
             mTextPaint.setColor(entry.getKey().getColor());
 
             float xInView = mGraphView.getDataPointXInView(entry.getValue(), entry.getKey(), false);
             float yInView = mGraphView.getDataPointYInView(entry.getValue(), entry.getKey(), false);
+
+            // Keep text inside graph at edges
+            String text = mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionX, true);
+            float textWidth = mTextPaint.measureText(text);
+            Paint.FontMetrics fm = mTextPaint.getFontMetrics();
+            float textHeight = fm.descent - fm.ascent;
+            if (textWidth + xInView > graphLeft + graphWidth) {
+                xInView = graphLeft + graphWidth - textWidth;
+            }
+            if (yInView < textHeight) {
+                yInView = textHeight;
+            } else if (yInView > graphHeight) {
+                yInView = graphHeight;
+            }
+
             canvas.drawText(mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionX, true), xInView, graphHeight, mTextPaint);
             canvas.drawText(mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionY, false), graphLeft + mStyles.padding, yInView, mTextPaint);
         }
