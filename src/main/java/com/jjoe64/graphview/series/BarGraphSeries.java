@@ -21,6 +21,7 @@ import android.graphics.Paint;
 import android.graphics.RectF;
 import androidx.core.view.ViewCompat;
 import android.util.Log;
+import android.util.Pair;
 import android.view.animation.AccelerateInterpolator;
 
 import com.jjoe64.graphview.GraphView;
@@ -473,11 +474,11 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
      * @return datapoint or null
      */
     @Override
-    protected E findDataPoint(float x, float y) {
+    protected Pair<E, Float> findDataPoint(float x, float y) {
         for (Map.Entry<RectD, E> entry : mDataPoints.entrySet()) {
             if (x >= entry.getKey().left && x <= entry.getKey().right
                 && y >= entry.getKey().top && y <= entry.getKey().bottom) {
-                return entry.getValue();
+                return new Pair<>(entry.getValue(), Float.NaN);
             }
         }
         return null;

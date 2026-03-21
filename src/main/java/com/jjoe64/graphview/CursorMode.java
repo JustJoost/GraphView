@@ -6,7 +6,6 @@ import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Rect;
 import android.graphics.RectF;
-import android.util.Log;
 import android.util.TypedValue;
 import android.view.MotionEvent;
 
@@ -14,9 +13,7 @@ import com.jjoe64.graphview.series.BaseSeries;
 import com.jjoe64.graphview.series.DataPointInterface;
 import com.jjoe64.graphview.series.Series;
 
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -102,7 +99,11 @@ public class CursorMode {
         mPosX = Math.min(mPosX, mGraphView.getGraphContentLeft() + mGraphView.getGraphContentWidth());
         mPosY = e.getY();
         mCursorVisible = true;
-        findCurrentDataPoint();
+        Map<BaseSeries, DataPointInterface> newCurrentSelection = findCurrentDataPoint();
+        if (!newCurrentSelection.equals(mCurrentSelection)) {
+            mCurrentSelection.clear();
+            mCurrentSelection.putAll(newCurrentSelection);
+        }
         mGraphView.invalidate();
     }
 
@@ -111,7 +112,11 @@ public class CursorMode {
             mPosX = Math.max(e.getX(), mGraphView.getGraphContentLeft());
             mPosX = Math.min(mPosX, mGraphView.getGraphContentLeft() + mGraphView.getGraphContentWidth());
             mPosY = e.getY();
-            findCurrentDataPoint();
+            Map<BaseSeries, DataPointInterface> newCurrentSelection = findCurrentDataPoint();
+            if (!newCurrentSelection.equals(mCurrentSelection)) {
+                mCurrentSelection.clear();
+                mCurrentSelection.putAll(newCurrentSelection);
+            }
             mGraphView.invalidate();
         }
     }
@@ -217,6 +222,8 @@ public class CursorMode {
         float graphLeft = mGraphView.getGraphContentLeft();
         float graphHeight = mGraphView.getGraphContentHeight();
         float graphWidth = mGraphView.getGraphContentWidth();
+        Paint.FontMetrics fm = mTextPaint.getFontMetrics();
+        float textHeight = fm.descent - fm.ascent;
 
         for (Map.Entry<BaseSeries, DataPointInterface> entry : mCurrentSelection.entrySet()) {
             mTextPaint.setColor(entry.getKey().getColor());
@@ -227,8 +234,6 @@ public class CursorMode {
             // Keep text inside graph at edges
             String text = mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionX, true);
             float textWidth = mTextPaint.measureText(text);
-            Paint.FontMetrics fm = mTextPaint.getFontMetrics();
-            float textHeight = fm.descent - fm.ascent;
             if (textWidth + xInView > graphLeft + graphWidth) {
                 xInView = graphLeft + graphWidth - textWidth;
             }
@@ -245,23 +250,25 @@ public class CursorMode {
 
     public boolean onUp(MotionEvent event) {
         mCursorVisible = false;
-        findCurrentDataPoint();
+//        findCurrentDataPoint();
         mGraphView.invalidate();
         return true;
     }
 
-    private void findCurrentDataPoint() {
-        mCurrentSelection.clear();
+    private Map<BaseSeries, DataPointInterface> findCurrentDataPoint() {
+        Map<BaseSeries, DataPointInterface> toReturn = new HashMap<>();
         for (Series series : mGraphView.getSeries()) {
             if (series instanceof BaseSeries) {
                 DataPointInterface p = ((BaseSeries) series).findDataPointAtX(mPosX);
                 if (p != null) {
                     mCurrentSelectionX = p.getX();
                     mCurrentSelectionY = p.getY();
-                    mCurrentSelection.put((BaseSeries) series, p);
+                    toReturn.put((BaseSeries) series, p);
                 }
             }
         }
+
+        return toReturn;
     }
 
     public void setTextSize(float t) {

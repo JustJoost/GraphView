@@ -18,6 +18,7 @@ package com.jjoe64.graphview.series;
 
 import android.graphics.Canvas;
 import android.graphics.PointF;
+import android.util.Pair;
 
 import com.jjoe64.graphview.GraphView;
 
@@ -301,7 +302,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      */
     @Override
     public void onTap(float x, float y) {
-        E p = findDataPoint(x, y);
+        E p = findDataPoint(x, y).first;
         if (p != null) {
             if (mOnDataPointTapListener != null) mOnDataPointTapListener.onTap(this, p);
         }
@@ -315,25 +316,24 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      * @param y pixel
      * @return the data point or null if nothing was found
      */
-    protected E findDataPoint(float x, float y) {
+    protected Pair<E, Float> findDataPoint(float x, float y) {
         float shortestDistance = Float.NaN;
-        E shortest = null;
+        E closestDataPoint = null;
         for (Map.Entry<PointF, E> entry : mDataPointsLocInView.entrySet()) {
             float xDiff = entry.getKey().x - x;
             float yDiff = entry.getKey().y - y;
 
             float distance = (float) Math.sqrt(xDiff*xDiff + yDiff*yDiff);
-            if (shortest == null || distance < shortestDistance) {
+            if (closestDataPoint == null || distance < shortestDistance) {
                 shortestDistance = distance;
-                shortest = entry.getValue();
+                closestDataPoint = entry.getValue();
             }
         }
-        if (shortest != null) {
-            if (shortestDistance < 120) {
-                return shortest;
-            }
+        if (closestDataPoint != null && shortestDistance < 120) {
+            return new Pair<>(closestDataPoint, shortestDistance);
+        } else {
+            return new Pair<>(null, Float.NaN);
         }
-        return null;
     }
 
     public E findDataPointAtX(float x) {
