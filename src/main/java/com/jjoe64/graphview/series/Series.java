@@ -121,6 +121,18 @@ public interface Series<E extends DataPointInterface> {
     boolean isEmpty();
 
     /**
+     * @return whether the series is editable
+     */
+    boolean isEditable();
+
+    /**
+     * set whether the series is editable
+     *
+     * @param editable
+     */
+    void setEditable(boolean editable);
+
+    /**
      * clear reference to view and activity
      *
      * @param graphView

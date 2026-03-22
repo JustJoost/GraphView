@@ -48,6 +48,9 @@ public class CursorMode {
     protected double mCurrentSelectionY;
     protected Styles mStyles;
     protected int cachedLegendWidth;
+    protected boolean execSecondTapActionOnUp;
+    protected DataPointInterface mPointBeingEdited = null;
+
 
     public CursorMode(GraphView graphView) {
         mStyles = new Styles();
@@ -103,6 +106,9 @@ public class CursorMode {
         if (!newCurrentSelection.equals(mCurrentSelection)) {
             mCurrentSelection.clear();
             mCurrentSelection.putAll(newCurrentSelection);
+            stopEdit();
+        } else {
+            execSecondTapActionOnUp = true;
         }
         mGraphView.invalidate();
     }
@@ -116,9 +122,21 @@ public class CursorMode {
             if (!newCurrentSelection.equals(mCurrentSelection)) {
                 mCurrentSelection.clear();
                 mCurrentSelection.putAll(newCurrentSelection);
+                execSecondTapActionOnUp = false;
+                stopEdit();
             }
             mGraphView.invalidate();
         }
+    }
+
+    public boolean onUp(MotionEvent e) {
+        mCursorVisible = false;
+        if (execSecondTapActionOnUp) {
+            execSecondTapActionOnUp = false;
+            startEdit(mGraphView.findDataPoint(e.getX(), e.getY(), true));
+        }
+        mGraphView.invalidate();
+        return true;
     }
 
     public void draw(Canvas canvas) {
@@ -248,13 +266,6 @@ public class CursorMode {
         }
     }
 
-    public boolean onUp(MotionEvent event) {
-        mCursorVisible = false;
-//        findCurrentDataPoint();
-        mGraphView.invalidate();
-        return true;
-    }
-
     private Map<BaseSeries, DataPointInterface> findCurrentDataPoint() {
         Map<BaseSeries, DataPointInterface> toReturn = new HashMap<>();
         for (Series series : mGraphView.getSeries()) {
@@ -269,6 +280,14 @@ public class CursorMode {
         }
 
         return toReturn;
+    }
+
+    private void startEdit(DataPointInterface dp) {
+        mPointBeingEdited = dp;
+    }
+
+    private void stopEdit() {
+        mPointBeingEdited = null;
     }
 
     public void setTextSize(float t) {

@@ -474,7 +474,7 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
      * @return datapoint or null
      */
     @Override
-    protected Pair<E, Float> findDataPoint(float x, float y) {
+    public Pair<E, Float> findDataPoint(float x, float y) {
         for (Map.Entry<RectD, E> entry : mDataPoints.entrySet()) {
             if (x >= entry.getKey().left && x <= entry.getKey().right
                 && y >= entry.getKey().top && y <= entry.getKey().bottom) {

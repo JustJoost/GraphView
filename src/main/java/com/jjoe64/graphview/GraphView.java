@@ -1,13 +1,13 @@
 /**
  * GraphView
  * Copyright 2016 Jonas Gehring
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -27,6 +27,7 @@ import android.net.Uri;
 import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.util.Log;
+import android.util.Pair;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -333,7 +334,7 @@ public class GraphView extends View implements Serializable {
     protected void onDraw(Canvas canvas) {
         if (isInEditMode()) {
             canvas.drawColor(Color.rgb(200, 200, 200));
-            canvas.drawText("GraphView: No Preview available", canvas.getWidth()/2, canvas.getHeight()/2, mPreviewPaint);
+            canvas.drawText("GraphView: No Preview available", canvas.getWidth() / 2, canvas.getHeight() / 2, mPreviewPaint);
         } else {
             drawGraphElements(canvas);
         }
@@ -347,11 +348,11 @@ public class GraphView extends View implements Serializable {
      * @param canvas Canvas
      */
     protected void drawTitle(Canvas canvas) {
-        if (mTitle != null && mTitle.length()>0) {
+        if (mTitle != null && mTitle.length() > 0) {
             mPaintTitle.setColor(mStyles.titleColor);
             mPaintTitle.setTextSize(mStyles.titleTextSize);
             mPaintTitle.setTextAlign(Paint.Align.CENTER);
-            float x = canvas.getWidth()/2;
+            float x = canvas.getWidth() / 2;
             float y = mPaintTitle.getTextSize();
             canvas.drawText(mTitle, x, y, mPaintTitle);
         }
@@ -365,7 +366,7 @@ public class GraphView extends View implements Serializable {
      *          returned.
      */
     protected int getTitleHeight() {
-        if (mTitle != null && mTitle.length()>0) {
+        if (mTitle != null && mTitle.length() > 0) {
             return (int) mPaintTitle.getTextSize();
         } else {
             return 0;
@@ -439,6 +440,15 @@ public class GraphView extends View implements Serializable {
         return graphwidth;
     }
 
+    /**
+     * Get x coordinate value of the datapoint in view coordinates (as opposed to the actual x
+     * coordinate of the underlying data).
+     *
+     * @param dp
+     * @param series
+     * @param forceReCalc if false, the cache is used
+     * @return x coordinate value of the datapoint in view coordinates
+     */
     public float getDataPointXInView(DataPointInterface dp, Series<?> series, Boolean forceReCalc) {
         // TODO: if forceReCalc is false, look up in cache
         float graphWidth = getGraphContentWidth();
@@ -453,6 +463,15 @@ public class GraphView extends View implements Serializable {
         return (float) x + (graphLeft + 1);
     }
 
+    /**
+     * Get y coordinate value of the datapoint in view coordinates (as opposed to the actual y
+     * coordinate of the underlying data).
+     *
+     * @param dp
+     * @param series
+     * @param forceReCalc if false, the cache is used
+     * @return y coordinate value of the datapoint in view coordinates
+     */
     public float getDataPointYInView(DataPointInterface dp, Series<?> series, Boolean forceReCalc) {
         // TODO: if forceReCalc is false, look up in cache
         float graphHeight = getGraphContentHeight();
@@ -472,6 +491,25 @@ public class GraphView extends View implements Serializable {
         double y = graphHeight * (dp.getY() - minY) / (maxY - minY);
 
         return (float) (graphTop - y) + graphHeight;
+    }
+
+    protected DataPointInterface findDataPoint(float x, float y, boolean onlyEditable) {
+        float shortestSqDist = Float.NaN;
+        DataPointInterface closest = null;
+        for (Series s : mSeries) {
+            if (onlyEditable && !(s.isEditable())) {
+                continue;
+            }
+            Pair p = ((BaseSeries) s).findDataPoint(x, y);
+            if (p.first instanceof DataPointInterface) {
+                if (closest == null || (float) p.second < shortestSqDist) {
+                    shortestSqDist = (float) p.second;
+                    closest = (DataPointInterface) p.first;
+                }
+            }
+        }
+
+        return closest;
     }
 
     /**

@@ -95,6 +95,9 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      */
     private final List<WeakReference<GraphView>> mGraphViews;
     private Boolean mIsCursorModeCache;
+    protected boolean mEditable = false;
+
+    /**
 
     /**
      * creates series without data
@@ -314,23 +317,24 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      *
      * @param x pixel
      * @param y pixel
-     * @return the data point or null if nothing was found
+     * @return pair of the data point or null if nothing was found, and the squared distance to the
+     *         coordinates of this data point
      */
-    protected Pair<E, Float> findDataPoint(float x, float y) {
-        float shortestDistance = Float.NaN;
+    public Pair<E, Float> findDataPoint(float x, float y) {
+        float shortestSqDist = Float.NaN;
         E closestDataPoint = null;
         for (Map.Entry<PointF, E> entry : mDataPointsLocInView.entrySet()) {
             float xDiff = entry.getKey().x - x;
             float yDiff = entry.getKey().y - y;
 
-            float distance = (float) Math.sqrt(xDiff*xDiff + yDiff*yDiff);
-            if (closestDataPoint == null || distance < shortestDistance) {
-                shortestDistance = distance;
+            float distance = xDiff*xDiff + yDiff*yDiff;
+            if (closestDataPoint == null || distance < shortestSqDist) {
+                shortestSqDist = distance;
                 closestDataPoint = entry.getValue();
             }
         }
-        if (closestDataPoint != null && shortestDistance < 120) {
-            return new Pair<>(closestDataPoint, shortestDistance);
+        if (closestDataPoint != null && shortestSqDist < 120*120) {
+            return new Pair<>(closestDataPoint, shortestSqDist);
         } else {
             return new Pair<>(null, Float.NaN);
         }
@@ -499,6 +503,24 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     @Override
     public boolean isEmpty() {
         return mData.isEmpty();
+    }
+
+    /**
+     * @return whether the series is editable
+     */
+    @Override
+    public boolean isEditable() {
+        return mEditable;
+    }
+
+    /**
+     * set whether the series is editable
+     *
+     * @param editable
+     */
+    @Override
+    public void setEditable(boolean editable) {
+        mEditable = editable;
     }
 
     /**
