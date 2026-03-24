@@ -493,9 +493,9 @@ public class GraphView extends View implements Serializable {
         return (float) (graphTop - y) + graphHeight;
     }
 
-    protected DataPointInterface findDataPoint(float x, float y, boolean onlyEditable) {
+    protected Pair<DataPointInterface, Series> findDataPoint(float x, float y, boolean onlyEditable) {
         float shortestSqDist = Float.NaN;
-        DataPointInterface closest = null;
+        Pair<DataPointInterface, Series> closest = null;
         for (Series s : mSeries) {
             if (onlyEditable && !(s.isEditable())) {
                 continue;
@@ -504,7 +504,7 @@ public class GraphView extends View implements Serializable {
             if (p.first instanceof DataPointInterface) {
                 if (closest == null || (float) p.second < shortestSqDist) {
                     shortestSqDist = (float) p.second;
-                    closest = (DataPointInterface) p.first;
+                    closest = new Pair<>((DataPointInterface) p.first, s);
                 }
             }
         }

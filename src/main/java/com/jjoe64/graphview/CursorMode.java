@@ -4,8 +4,10 @@ import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.RectF;
+import android.util.Pair;
 import android.util.TypedValue;
 import android.view.MotionEvent;
 
@@ -21,6 +23,7 @@ import java.util.Map;
  */
 
 public class CursorMode {
+    // region Initialization and variables
     private final static class Styles {
         public float textSize;
         public int spacing;
@@ -36,6 +39,10 @@ public class CursorMode {
         LEGEND, AXIS_LABELS
     }
 
+    public enum State {
+        IDLE, EDIT
+    }
+
     protected final Paint mPaintLine;
     protected final GraphView mGraphView;
     protected float mPosX;
@@ -49,8 +56,10 @@ public class CursorMode {
     protected Styles mStyles;
     protected int cachedLegendWidth;
     protected boolean execSecondTapActionOnUp;
-    protected DataPointInterface mPointBeingEdited = null;
-
+    protected Pair<DataPointInterface, Series> mPointBeingEdited = null;
+    protected float controlBoxHeight = 200.f;
+    protected float controlBoxWidth = 200.f;
+    private State mState = State.IDLE;
 
     public CursorMode(GraphView graphView) {
         mStyles = new Styles();
@@ -95,8 +104,9 @@ public class CursorMode {
 
         cachedLegendWidth = 0;
     }
+    // endregion
 
-
+    // region Touch events
     public void onDown(MotionEvent e) {
         mPosX = Math.max(e.getX(), mGraphView.getGraphContentLeft());
         mPosX = Math.min(mPosX, mGraphView.getGraphContentLeft() + mGraphView.getGraphContentWidth());
@@ -139,6 +149,9 @@ public class CursorMode {
         return true;
     }
 
+    // endregion
+
+    // region Drawing and helper methods
     public void draw(Canvas canvas) {
         if (mCursorVisible) {
             canvas.drawLine(mPosX, 0, mPosX, canvas.getHeight(), mPaintLine);
@@ -158,6 +171,10 @@ public class CursorMode {
                     drawLabels(canvas);
                     break;
             }
+        }
+
+        if (mPointBeingEdited != null) {
+            drawControlBox(canvas);
         }
     }
 
@@ -253,18 +270,82 @@ public class CursorMode {
             String text = mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionX, true);
             float textWidth = mTextPaint.measureText(text);
             if (textWidth + xInView > graphLeft + graphWidth) {
-                xInView = graphLeft + graphWidth - textWidth;
+                xInView = graphLeft + graphWidth - textWidth + mStyles.padding;
             }
             if (yInView < textHeight) {
                 yInView = textHeight;
             } else if (yInView > graphHeight) {
-                yInView = graphHeight;
+                yInView = graphHeight + mStyles.padding;
             }
 
             canvas.drawText(mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionX, true), xInView, graphHeight, mTextPaint);
             canvas.drawText(mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionY, false), graphLeft + mStyles.padding, yInView, mTextPaint);
         }
     }
+
+    protected void drawControlBox(Canvas canvas) {
+        Paint arrowPaint = new Paint(mPaintLine);
+        float arrowSize = mStyles.textSize / 2;
+        float graphLeft = mGraphView.getGraphContentLeft();
+        float graphHeight = mGraphView.getGraphContentHeight();
+        float graphWidth = mGraphView.getGraphContentWidth();
+
+        float right = mGraphView.getDataPointXInView(mPointBeingEdited.first, null, false)
+                + controlBoxWidth / 2;;
+        float bottom = mGraphView.getDataPointYInView(mPointBeingEdited.first, null, false)
+                + controlBoxHeight / 2;
+
+        // Keep in graph area
+        if (right > graphLeft + graphWidth - arrowSize) {
+            right = graphLeft + graphWidth - arrowSize;
+        }
+        float left = right - controlBoxWidth;
+        if (left < graphLeft + arrowSize) {
+            left = graphLeft + arrowSize;
+            right = left + controlBoxWidth;
+        }
+        if (bottom > graphHeight - arrowSize) {
+            bottom = graphHeight + mStyles.padding - arrowSize;
+        }
+        float top = bottom - controlBoxHeight;
+        if (top < arrowSize) {
+            top = arrowSize;
+            bottom = top + controlBoxHeight;
+        }
+
+        float centerX = (left + right) / 2;
+        float centerY = (top + bottom) / 2;
+
+        Path arrowUp = new Path();
+        arrowUp.moveTo(centerX - arrowSize, top);
+        arrowUp.lineTo(centerX, top - arrowSize);
+        arrowUp.lineTo(centerX + arrowSize, top);
+        arrowUp.close();
+
+        Path arrowDown = new Path();
+        arrowDown.moveTo(centerX - arrowSize, bottom);
+        arrowDown.lineTo(centerX, bottom + arrowSize);
+        arrowDown.lineTo(centerX + arrowSize, bottom);
+        arrowDown.close();
+
+        Path arrowLeft = new Path();
+        arrowLeft.moveTo(left, centerY - arrowSize);
+        arrowLeft.lineTo(left - arrowSize, centerY);
+        arrowLeft.lineTo(left, centerY + arrowSize);
+        arrowLeft.close();
+
+        Path arrowRight = new Path();
+        arrowRight.moveTo(right, centerY - arrowSize);
+        arrowRight.lineTo(right + arrowSize, centerY);
+        arrowRight.lineTo(right, centerY + arrowSize);
+        arrowRight.close();
+
+        canvas.drawPath(arrowUp, arrowPaint);
+        canvas.drawPath(arrowDown, arrowPaint);
+        canvas.drawPath(arrowLeft, arrowPaint);
+        canvas.drawPath(arrowRight, arrowPaint);
+    }
+    // endregion
 
     private Map<BaseSeries, DataPointInterface> findCurrentDataPoint() {
         Map<BaseSeries, DataPointInterface> toReturn = new HashMap<>();
@@ -282,14 +363,17 @@ public class CursorMode {
         return toReturn;
     }
 
-    private void startEdit(DataPointInterface dp) {
-        mPointBeingEdited = dp;
+    private void startEdit(Pair<DataPointInterface, Series> closest) {
+        mPointBeingEdited = closest;
+        mState = State.EDIT;
     }
 
     private void stopEdit() {
         mPointBeingEdited = null;
+        mState = State.IDLE;
     }
 
+    // region Style setters
     public void setTextSize(float t) {
         mStyles.textSize = t;
     }
@@ -321,4 +405,6 @@ public class CursorMode {
     public void setCoordinatesDisplayType(CoordinatesDisplayType type) {
         mStyles.coordinatesDisplayType = type;
     }
+
+    // endregion
 }
