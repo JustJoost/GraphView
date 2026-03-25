@@ -23,6 +23,10 @@ import java.util.Map;
  */
 
 public class CursorMode {
+
+    private float mControlsCenterX;
+    private float mControlsCenterY;
+
     // region Initialization and variables
     private final static class Styles {
         public float textSize;
@@ -143,7 +147,10 @@ public class CursorMode {
         mCursorVisible = false;
         if (execSecondTapActionOnUp) {
             execSecondTapActionOnUp = false;
-            startEdit(mGraphView.findDataPoint(e.getX(), e.getY(), true));
+            Pair<DataPointInterface, Series> dp = mGraphView.findDataPoint(e.getX(), e.getY(), true);
+            if (dp != null && dp.first.equals(mCurrentSelection.get(dp.second))) {
+                startEdit(dp);
+            }
         }
         mGraphView.invalidate();
         return true;
@@ -283,61 +290,60 @@ public class CursorMode {
         }
     }
 
-    protected void drawControlBox(Canvas canvas) {
-        Paint arrowPaint = new Paint(mPaintLine);
-        float arrowSize = mStyles.textSize / 2;
+    private void updateControlsCenter(float padding) {
         float graphLeft = mGraphView.getGraphContentLeft();
         float graphHeight = mGraphView.getGraphContentHeight();
         float graphWidth = mGraphView.getGraphContentWidth();
 
-        float right = mGraphView.getDataPointXInView(mPointBeingEdited.first, null, false)
-                + controlBoxWidth / 2;;
-        float bottom = mGraphView.getDataPointYInView(mPointBeingEdited.first, null, false)
-                + controlBoxHeight / 2;
+        mControlsCenterX = mGraphView.getDataPointXInView(mPointBeingEdited.first, null, false);
+        mControlsCenterY = mGraphView.getDataPointYInView(mPointBeingEdited.first, null, false);
 
-        // Keep in graph area
-        if (right > graphLeft + graphWidth - arrowSize) {
-            right = graphLeft + graphWidth - arrowSize;
+        // Ensure controls remain in graph area
+        if (mControlsCenterX > graphLeft + graphWidth - controlBoxWidth/2 - padding) {
+            mControlsCenterX = graphLeft + graphWidth - controlBoxWidth/2 - padding;
+        } else if (mControlsCenterX < graphLeft + controlBoxWidth/2 + padding) {
+            mControlsCenterX = graphLeft + controlBoxWidth/2 + padding;
         }
+        if (mControlsCenterY > graphHeight - controlBoxHeight/2) {
+            mControlsCenterY = graphHeight - controlBoxHeight/2;
+        } else if (mControlsCenterY < controlBoxHeight/2 + padding) {
+            mControlsCenterY = controlBoxHeight/2 + padding;
+        }
+    }
+
+    protected void drawControlBox(Canvas canvas) {
+        Paint arrowPaint = new Paint(mPaintLine);
+        float arrowSize = mStyles.textSize / 2;
+
+        updateControlsCenter(arrowSize);
+
+        float right = mControlsCenterX + controlBoxWidth / 2;
+        float bottom = mControlsCenterY + controlBoxHeight / 2;
         float left = right - controlBoxWidth;
-        if (left < graphLeft + arrowSize) {
-            left = graphLeft + arrowSize;
-            right = left + controlBoxWidth;
-        }
-        if (bottom > graphHeight - arrowSize) {
-            bottom = graphHeight + mStyles.padding - arrowSize;
-        }
         float top = bottom - controlBoxHeight;
-        if (top < arrowSize) {
-            top = arrowSize;
-            bottom = top + controlBoxHeight;
-        }
-
-        float centerX = (left + right) / 2;
-        float centerY = (top + bottom) / 2;
 
         Path arrowUp = new Path();
-        arrowUp.moveTo(centerX - arrowSize, top);
-        arrowUp.lineTo(centerX, top - arrowSize);
-        arrowUp.lineTo(centerX + arrowSize, top);
+        arrowUp.moveTo(mControlsCenterX - arrowSize, top);
+        arrowUp.lineTo(mControlsCenterX, top - arrowSize);
+        arrowUp.lineTo(mControlsCenterX + arrowSize, top);
         arrowUp.close();
 
         Path arrowDown = new Path();
-        arrowDown.moveTo(centerX - arrowSize, bottom);
-        arrowDown.lineTo(centerX, bottom + arrowSize);
-        arrowDown.lineTo(centerX + arrowSize, bottom);
+        arrowDown.moveTo(mControlsCenterX - arrowSize, bottom);
+        arrowDown.lineTo(mControlsCenterX, bottom + arrowSize);
+        arrowDown.lineTo(mControlsCenterX + arrowSize, bottom);
         arrowDown.close();
 
         Path arrowLeft = new Path();
-        arrowLeft.moveTo(left, centerY - arrowSize);
-        arrowLeft.lineTo(left - arrowSize, centerY);
-        arrowLeft.lineTo(left, centerY + arrowSize);
+        arrowLeft.moveTo(left, mControlsCenterY - arrowSize);
+        arrowLeft.lineTo(left - arrowSize, mControlsCenterY);
+        arrowLeft.lineTo(left, mControlsCenterY + arrowSize);
         arrowLeft.close();
 
         Path arrowRight = new Path();
-        arrowRight.moveTo(right, centerY - arrowSize);
-        arrowRight.lineTo(right + arrowSize, centerY);
-        arrowRight.lineTo(right, centerY + arrowSize);
+        arrowRight.moveTo(right, mControlsCenterY - arrowSize);
+        arrowRight.lineTo(right + arrowSize, mControlsCenterY);
+        arrowRight.lineTo(right, mControlsCenterY + arrowSize);
         arrowRight.close();
 
         canvas.drawPath(arrowUp, arrowPaint);
