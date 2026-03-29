@@ -80,7 +80,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     private double mLowestYCache = Double.NaN;
 
     /**
-     * cahce for highest y value
+     * cache for highest y value
      */
     private double mHighestYCache = Double.NaN;
 
@@ -96,8 +96,12 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     private final List<WeakReference<GraphView>> mGraphViews;
     private Boolean mIsCursorModeCache;
     protected boolean mEditable = false;
-
-    /**
+    protected double mEditIncrementX = 0f;
+    protected double mEditIncrementY = 0f;
+    protected double mEditMinX = 0f;
+    protected double mEditMaxX = 0f;
+    protected double mEditMinY = 0f;
+    protected double mEditMaxY = 0f;
 
     /**
      * creates series without data
@@ -118,6 +122,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
         checkValueOrder(null);
     }
 
+    // region Getters and setters
     /**
      * @return the lowest x value, or 0 if there is no data
      */
@@ -296,6 +301,67 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
         this.mOnDataPointTapListener = l;
     }
 
+    @Override
+    public double getEditIncrementX() {
+        return mEditIncrementX;
+    }
+
+    @Override
+    public void setEditIncrementX(double mEditIncrementX) {
+        this.mEditIncrementX = mEditIncrementX;
+    }
+
+    @Override
+    public double getEditIncrementY() {
+        return mEditIncrementY;
+    }
+
+    @Override
+    public void setEditIncrementY(double mEditIncrementY) {
+        this.mEditIncrementY = mEditIncrementY;
+    }
+
+    @Override
+    public double getEditMinX() {
+        return mEditMinX;
+    }
+
+    @Override
+    public void setEditMinX(double mMinX) {
+        this.mEditMinX = mMinX;
+    }
+
+    @Override
+    public double getEditMaxX() {
+        return mEditMaxX;
+    }
+
+    @Override
+    public void setEditMaxX(double mMaxX) {
+        this.mEditMaxX = mMaxX;
+    }
+
+    @Override
+    public double getEditMinY() {
+        return mEditMinY;
+    }
+
+    @Override
+    public void setEditMinY(double mMinY) {
+        this.mEditMinY = mMinY;
+    }
+
+    @Override
+    public double getEditMaxY() {
+        return mEditMaxY;
+    }
+
+    @Override
+    public void setEditMaxY(double mMaxY) {
+        this.mEditMaxY = mMaxY;
+    }
+    // endregion
+
     /**
      * called by the tap detector in order to trigger
      * the on tap on datapoint event.
@@ -465,6 +531,18 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
                 }
             }
 
+            if (mEditMinY > dataPointY) {
+                mEditMinY = dataPointY;
+            }
+            if (mEditMaxY < dataPointY) {
+                mEditMaxY = dataPointY;
+            }
+            if (mEditMinX > dataPoint.getX()) {
+                mEditMinX = dataPoint.getX();
+            }
+            if (mEditMaxX < dataPoint.getX()) {
+                mEditMaxX = dataPoint.getX();
+            }
         }
 
         if (!silent) {

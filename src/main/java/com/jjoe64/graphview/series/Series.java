@@ -132,6 +132,30 @@ public interface Series<E extends DataPointInterface> {
      */
     void setEditable(boolean editable);
 
+    public double getEditIncrementX();
+
+    public void setEditIncrementX(double mEditIncrementX);
+
+    public double getEditIncrementY();
+
+    public void setEditIncrementY(double mEditIncrementY);
+
+    public double getEditMinX();
+
+    public void setEditMinX(double mMinX);
+
+    public double getEditMaxX();
+
+    public void setEditMaxX(double mMaxX);
+
+    public double getEditMinY();
+
+    public void setEditMinY(double mMinY);
+
+    public double getEditMaxY();
+
+    public void setEditMaxY(double mMaxY);
+
     /**
      * clear reference to view and activity
      *

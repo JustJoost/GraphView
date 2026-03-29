@@ -1351,10 +1351,23 @@ public class Viewport {
        mMinimalViewport.set(minX, maxY, maxX, minY);
     }
 
-    public void zoomToFit() {
-        setMinX(0.0);
-        setMaxX(getMaxX(true));
-        setMinY(0.0);
-        setMaxY(getMaxY(true));
+    public void zoomToFit(float paddingTop, float paddingBottom, float paddingLeft, float paddingRight,
+                          boolean xFromZero, boolean yFromZero) {
+        if (xFromZero) {
+            setMinX(0);
+        } else {
+            setMinX(getMinX(true) - paddingLeft);
+        }
+        setMaxX(getMaxX(true) + paddingRight);
+        if (yFromZero) {
+            setMinY(0);
+        } else {
+            setMinY(getMinY(true) - paddingBottom);
+        }
+        setMaxY(getMaxY(true) + paddingTop);
+    }
+
+    public void zoomToFit () {
+        zoomToFit(0.0f, 0.0f, 0.0f, 0.0f, true, true);
     }
 }

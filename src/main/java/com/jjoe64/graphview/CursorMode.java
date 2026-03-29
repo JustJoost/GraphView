@@ -3,8 +3,10 @@ package com.jjoe64.graphview;
 import android.content.res.TypedArray;
 import android.graphics.Canvas;
 import android.graphics.Color;
+import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
+import android.graphics.PointF;
 import android.graphics.Rect;
 import android.graphics.RectF;
 import android.util.Pair;
@@ -24,10 +26,6 @@ import java.util.Map;
  */
 
 public class CursorMode {
-
-    private float mControlsCenterX;
-    private float mControlsCenterY;
-
     // region Initialization and variables
     private final static class Styles {
         public float textSize;
@@ -38,9 +36,13 @@ public class CursorMode {
         public int margin;
         public int textColor;
         public CoordinatesDisplayType coordinatesDisplayType;
+    }
+
+    private static final class EditParameters {
         public float controlBoxHeight = 200.f;
         public float controlBoxWidth = 200.f;
         public float arrowSize;
+        public int controlsColor = Color.RED;
     }
 
     public enum CoordinatesDisplayType {
@@ -48,7 +50,7 @@ public class CursorMode {
     }
 
     public enum State {
-        IDLE, SELECT, SELECT_EDIT_ARMED, EDIT
+        IDLE, SELECT, EDIT, DRAG
     }
 
     protected final Paint mPaintLine;
@@ -63,7 +65,13 @@ public class CursorMode {
     protected Styles mStyles;
     protected int cachedLegendWidth;
     protected Pair<DataPointInterface, Series> mPointBeingEdited = null;
+    private PointF mPointBeingEditedCoords = new PointF();
     private State mState = State.IDLE;
+    private PointF editDelta = new PointF();
+    private float mControlsCenterX;
+    private float mControlsCenterY;
+    private final EditParameters mEditParameters = new EditParameters();
+
 
     public CursorMode(GraphView graphView) {
         mStyles = new Styles();
@@ -89,7 +97,7 @@ public class CursorMode {
         mStyles.backgroundColor = Color.argb(180, 100, 100, 100);
         mStyles.margin = (int) (mStyles.textSize);
         mStyles.coordinatesDisplayType = CoordinatesDisplayType.LEGEND;
-        mStyles.arrowSize = (int) (mStyles.textSize / 2);
+        mEditParameters.arrowSize = (int) (mStyles.textSize / 2);
 
         // get matching styles from theme
         TypedValue typedValue = new TypedValue();
@@ -133,9 +141,21 @@ public class CursorMode {
         if (!newCurrentSelection.equals(mCurrentSelection)) {
             mCurrentSelection.clear();
             mCurrentSelection.putAll(newCurrentSelection);
-            stopEdit();
+            mState = State.SELECT;
         } else {
-            mState = State.SELECT_EDIT_ARMED;
+            Pair<DataPointInterface, Series> dp = mGraphView.findDataPoint(mPosX, mPosY, true);
+            // Point found can differ from the one that was selected before, because new data point
+            // was selected based on x AND y, as opposed to just x. In this case, it was not a 'second'
+            // tap, do not start editing
+            if (dp != null && dp.first.equals(mCurrentSelection.get(dp.second))) {
+                mPointBeingEdited = dp;
+                mPointBeingEditedCoords.set(mGraphView.getDataPointXInView(dp.first, dp.second, false),
+                        mGraphView.getDataPointYInView(dp.first, dp.second, false));
+                mState = State.EDIT;
+                updateControlsCenter(mEditParameters.arrowSize);
+            } else {
+                mState = State.IDLE;
+            }
         }
     }
 
@@ -143,50 +163,70 @@ public class CursorMode {
         float deltaX = mPosX - mControlsCenterX;
         float deltaY = mPosY - mControlsCenterY;
 
-        if (Math.abs(deltaX) > 2.f / 3.f * mStyles.controlBoxWidth || Math.abs(deltaY) > 2.f / 3.f * mStyles.controlBoxHeight) {
+        if (Math.abs(deltaX) > 2.f / 3.f * mEditParameters.controlBoxWidth || Math.abs(deltaY) > 2.f / 3.f * mEditParameters.controlBoxHeight) {
             idleOrSelectOnDown();
             return;
         }
 
-        float col = (int) ((deltaX + 2.f / 3.f * mStyles.controlBoxWidth) / (4.f / 9.f * mStyles.controlBoxWidth));
-        float row = (int) ((deltaY + 2.f / 3.f * mStyles.controlBoxHeight) / (4.f / 9.f * mStyles.controlBoxHeight));
+        float col = (int) ((deltaX + 2.f / 3.f * mEditParameters.controlBoxWidth) / (4.f / 9.f * mEditParameters.controlBoxWidth));
+        float row = (int) ((deltaY + 2.f / 3.f * mEditParameters.controlBoxHeight) / (4.f / 9.f * mEditParameters.controlBoxHeight));
 
-        Toast.makeText(mGraphView.getContext(), "row: " + row + " col: " + col, Toast.LENGTH_SHORT).show();
+        if (row == 1 && col == 1) {
+            mState = State.DRAG;
+        }
     }
 
     public void onMove(MotionEvent e) {
-        if (mState == State.SELECT || mState == State.SELECT_EDIT_ARMED) {
-            mPosX = Math.max(e.getX(), mGraphView.getGraphContentLeft());
-            mPosX = Math.min(mPosX, mGraphView.getGraphContentLeft() + mGraphView.getGraphContentWidth());
-            mPosY = e.getY();
-            Map<BaseSeries, DataPointInterface> newCurrentSelection = findCurrentDataPointsAtX();
-            if (!newCurrentSelection.equals(mCurrentSelection)) {
-                mCurrentSelection.clear();
-                mCurrentSelection.putAll(newCurrentSelection);
-                mPointBeingEdited = null;
-                mState = State.SELECT;
-            }
-            mGraphView.invalidate();
+        mPosX = Math.max(e.getX(), mGraphView.getGraphContentLeft());
+        mPosX = Math.min(mPosX, mGraphView.getGraphContentLeft() + mGraphView.getGraphContentWidth());
+        mPosY = e.getY();
+        switch (mState) {
+            case SELECT:
+                Map<BaseSeries, DataPointInterface> newCurrentSelection = findCurrentDataPointsAtX();
+                if (!newCurrentSelection.equals(mCurrentSelection)) {
+                    mCurrentSelection.clear();
+                    mCurrentSelection.putAll(newCurrentSelection);
+                }
+                break;
+            case DRAG:
+                dragOnDown();
+                break;
+        }
+        mGraphView.invalidate();
+    }
+
+    void dragOnDown() {
+        // Keep drag arrows in graph area
+        if (mPosX < mGraphView.getGraphContentLeft()) {
+            editDelta.x = mGraphView.getGraphContentLeft() - mPointBeingEditedCoords.x;
+        } else if (mPosX > mGraphView.getGraphContentLeft() + mGraphView.getGraphContentWidth()) {
+            editDelta.x = mGraphView.getGraphContentLeft() + mGraphView.getGraphContentWidth();
+        } else {
+            editDelta.x = mPosX - mPointBeingEditedCoords.x;
+        }
+        if (mPosY > mGraphView.getGraphContentHeight() + mStyles.padding) {
+            editDelta.y = mGraphView.getGraphContentHeight() + mStyles.padding - mPointBeingEditedCoords.y;
+        } else if (mPosY < mStyles.padding) {
+            editDelta.y = mStyles.padding - mPointBeingEditedCoords.y;
+        } else {
+            editDelta.y = mPosY - mPointBeingEditedCoords.y;
+        }
+
+        // Pick x or y drag based on largest distance
+        if (Math.abs(editDelta.x) > Math.abs(editDelta.y)) {
+            editDelta.y = 0;
+        } else {
+            editDelta.x = 0;
         }
     }
 
     public boolean onUp(MotionEvent e) {
         switch (mState) {
-            case SELECT_EDIT_ARMED:
-                Pair<DataPointInterface, Series> dp = mGraphView.findDataPoint(mPosX, mPosY, true);
-                // Point found can differ from the one that was selected before, because new data point
-                // was selected based on x AND y, as opposed to just x. In this case, it was not a 'second'
-                // tap, do not start editing
-                if (dp != null && dp.first.equals(mCurrentSelection.get(dp.second))) {
-                    mPointBeingEdited = dp;
-                    mState = State.EDIT;
-                    updateControlsCenter(mStyles.arrowSize);
-                } else {
-                    mState = State.IDLE;
-                }
-                break;
             case SELECT:
                 mState = State.IDLE;
+                break;
+            case DRAG:
+                mState = State.EDIT;
                 break;
         }
 
@@ -198,7 +238,7 @@ public class CursorMode {
 
     // region Drawing and helper methods
     public void draw(Canvas canvas) {
-        if (mState == State.SELECT || mState == State.SELECT_EDIT_ARMED) {
+        if (mState == State.SELECT) {
             canvas.drawLine(mPosX, 0, mPosX, canvas.getHeight(), mPaintLine);
         }
 
@@ -218,8 +258,8 @@ public class CursorMode {
             }
         }
 
-        if (mPointBeingEdited != null) {
-            drawControlBox(canvas);
+        if (mState == State.EDIT || mState == State.DRAG) {
+            drawControls(canvas);
         }
     }
 
@@ -337,57 +377,90 @@ public class CursorMode {
         mControlsCenterY = mGraphView.getDataPointYInView(mPointBeingEdited.first, null, false);
 
         // Ensure controls remain in graph area
-        if (mControlsCenterX > graphLeft + graphWidth - mStyles.controlBoxWidth / 2 - padding) {
-            mControlsCenterX = graphLeft + graphWidth - mStyles.controlBoxWidth / 2 - padding;
-        } else if (mControlsCenterX < graphLeft + mStyles.controlBoxWidth / 2 + padding) {
-            mControlsCenterX = graphLeft + mStyles.controlBoxWidth / 2 + padding;
+        if (mControlsCenterX > graphLeft + graphWidth - mEditParameters.controlBoxWidth / 2 - padding) {
+            mControlsCenterX = graphLeft + graphWidth - mEditParameters.controlBoxWidth / 2 - padding;
+        } else if (mControlsCenterX < graphLeft + mEditParameters.controlBoxWidth / 2 + padding) {
+            mControlsCenterX = graphLeft + mEditParameters.controlBoxWidth / 2 + padding;
         }
-        if (mControlsCenterY > graphHeight - mStyles.controlBoxHeight / 2) {
-            mControlsCenterY = graphHeight - mStyles.controlBoxHeight / 2;
-        } else if (mControlsCenterY < mStyles.controlBoxHeight / 2 + padding) {
-            mControlsCenterY = mStyles.controlBoxHeight / 2 + padding;
+        if (mControlsCenterY > graphHeight - mEditParameters.controlBoxHeight / 2) {
+            mControlsCenterY = graphHeight - mEditParameters.controlBoxHeight / 2;
+        } else if (mControlsCenterY < mEditParameters.controlBoxHeight / 2 + padding) {
+            mControlsCenterY = mEditParameters.controlBoxHeight / 2 + padding;
         }
     }
 
-    protected void drawControlBox(Canvas canvas) {
+    protected void drawControls(Canvas canvas) {
         Paint arrowPaint = new Paint(mPaintLine);
         float arrowSize = mStyles.textSize / 2;
+        float arrowDist = 75.f;
+        float dpX = mGraphView.getDataPointXInView(mPointBeingEdited.first, null, false);
+        float dpY = mGraphView.getDataPointYInView(mPointBeingEdited.first, null, false);
+        float graphHeight = mGraphView.getGraphContentHeight();
+        float graphLeft = mGraphView.getGraphContentLeft();
 
         updateControlsCenter(arrowSize);
 
-        float right = mControlsCenterX + mStyles.controlBoxWidth / 2;
-        float bottom = mControlsCenterY + mStyles.controlBoxHeight / 2;
-        float left = right - mStyles.controlBoxWidth;
-        float top = bottom - mStyles.controlBoxHeight;
+//        float right = mControlsCenterX + mStyles.controlBoxWidth / 2;
+//        float bottom = mControlsCenterY + mStyles.controlBoxHeight / 2;
+//        float left = right - mStyles.controlBoxWidth;
+//        float top = bottom - mStyles.controlBoxHeight;
 
-        Path arrowUp = new Path();
-        arrowUp.moveTo(mControlsCenterX - arrowSize, top);
-        arrowUp.lineTo(mControlsCenterX, top - arrowSize);
-        arrowUp.lineTo(mControlsCenterX + arrowSize, top);
-        arrowUp.close();
+        Path baseArrow = new Path();
+        baseArrow.moveTo(-arrowSize, arrowSize);
+        baseArrow.lineTo(0, 0);
+        baseArrow.lineTo(arrowSize, arrowSize);
+        baseArrow.close();
 
-        Path arrowDown = new Path();
-        arrowDown.moveTo(mControlsCenterX - arrowSize, bottom);
-        arrowDown.lineTo(mControlsCenterX, bottom + arrowSize);
-        arrowDown.lineTo(mControlsCenterX + arrowSize, bottom);
-        arrowDown.close();
+        Path arrowUp = rotAndTranslate(baseArrow, 0, dpX, dpY - arrowDist);
+        Path arrowDown = rotAndTranslate(baseArrow, 180, dpX, dpY + arrowDist);
+        Path arrowLeft = rotAndTranslate(baseArrow, 270, dpX - arrowDist, dpY);
+        Path arrowRight = rotAndTranslate(baseArrow, 90, dpX + arrowDist, dpY);
 
-        Path arrowLeft = new Path();
-        arrowLeft.moveTo(left, mControlsCenterY - arrowSize);
-        arrowLeft.lineTo(left - arrowSize, mControlsCenterY);
-        arrowLeft.lineTo(left, mControlsCenterY + arrowSize);
-        arrowLeft.close();
-
-        Path arrowRight = new Path();
-        arrowRight.moveTo(right, mControlsCenterY - arrowSize);
-        arrowRight.lineTo(right + arrowSize, mControlsCenterY);
-        arrowRight.lineTo(right, mControlsCenterY + arrowSize);
-        arrowRight.close();
+        Path arrowDelta;
+        if (editDelta.x != 0) {
+            float angle = 90;
+            if (editDelta.x < 0) {
+                angle = 270;
+            }
+            arrowDelta = rotAndTranslate(baseArrow, angle, mPointBeingEditedCoords.x + editDelta.x,
+                    graphHeight + mStyles.padding);
+            arrowDelta.moveTo(mPointBeingEditedCoords.x, graphHeight + mStyles.padding);
+            arrowDelta.lineTo(mPointBeingEditedCoords.x + editDelta.x, graphHeight + mStyles.padding);
+        } else {
+            float angle = 0;
+            if (editDelta.y > 0) {
+                angle = 180;
+            }
+            arrowDelta = rotAndTranslate(baseArrow, angle, graphLeft,
+                    mPointBeingEditedCoords.y + editDelta.y);
+            arrowDelta.moveTo(graphLeft, mPointBeingEditedCoords.y);
+            arrowDelta.lineTo(graphLeft, mPointBeingEditedCoords.y + editDelta.y);
+        }
 
         canvas.drawPath(arrowUp, arrowPaint);
         canvas.drawPath(arrowDown, arrowPaint);
         canvas.drawPath(arrowLeft, arrowPaint);
         canvas.drawPath(arrowRight, arrowPaint);
+        canvas.drawLine(dpX, dpY, dpX, canvas.getHeight(), mPaintLine);
+        canvas.drawLine(0, dpY, dpX, dpY, mPaintLine);
+        if (mState == State.DRAG) {
+            arrowPaint.setStyle(Paint.Style.FILL_AND_STROKE);
+            arrowPaint.setColor(mEditParameters.controlsColor);
+            canvas.drawPath(arrowDelta, arrowPaint);
+        }
+    }
+
+    private Path rotAndTranslate(Path path, float angle, float dx, float dy) {
+        Matrix rotMat = new Matrix();
+        rotMat.postRotate(angle);
+        Matrix moveMat = new Matrix();
+        moveMat.setTranslate(dx, dy);
+
+        Path toReturn = new Path();
+        toReturn.addPath(path, rotMat);
+        toReturn.transform(moveMat);
+
+        return toReturn;
     }
     // endregion
 
