@@ -68,6 +68,9 @@ public interface Series<E extends DataPointInterface> {
      */
     public Iterator<E> getValues(double from, double until);
 
+    public E getNextDataPoint(int index);
+    public E getPreviousDataPoint(int index);
+
     /**
      * Plots the series to the viewport.
      * You have to care about overdrawing.

@@ -27,7 +27,6 @@ import android.net.Uri;
 import android.provider.MediaStore;
 import android.util.AttributeSet;
 import android.util.Log;
-import android.util.Pair;
 import android.view.MotionEvent;
 import android.view.View;
 
@@ -39,6 +38,8 @@ import java.io.ByteArrayOutputStream;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
+
+import kotlin.Triple;
 
 /**
  * @author jjoe64
@@ -107,6 +108,12 @@ public class GraphView extends View implements Serializable {
             }
             return false;
         }
+    }
+
+    public class DataPointInfo {
+        public DataPointInterface dataPoint;
+        public Series series;
+        public int index;
     }
 
     /**
@@ -337,6 +344,7 @@ public class GraphView extends View implements Serializable {
             canvas.drawText("GraphView: No Preview available", canvas.getWidth() / 2, canvas.getHeight() / 2, mPreviewPaint);
         } else {
             drawGraphElements(canvas);
+            mViewport.recalcDatapointToViewFactors();
         }
     }
 
@@ -493,23 +501,26 @@ public class GraphView extends View implements Serializable {
         return (float) (graphTop - y) + graphHeight;
     }
 
-    protected Pair<DataPointInterface, Series> findDataPoint(float x, float y, boolean onlyEditable) {
+    protected DataPointInfo findDataPoint(float x, float y, boolean onlyEditable) {
         float shortestSqDist = Float.NaN;
-        Pair<DataPointInterface, Series> closest = null;
+        DataPointInfo toReturn = new DataPointInfo();
+        toReturn.dataPoint = null;
         for (Series s : mSeries) {
             if (onlyEditable && !(s.isEditable())) {
                 continue;
             }
-            Pair p = ((BaseSeries) s).findDataPoint(x, y);
-            if (p.first instanceof DataPointInterface) {
-                if (closest == null || (float) p.second < shortestSqDist) {
-                    shortestSqDist = (float) p.second;
-                    closest = new Pair<>((DataPointInterface) p.first, s);
+            Triple<DataPointInterface, Integer, Float> t = ((BaseSeries) s).findDataPoint(x, y);
+            if (t.getFirst() != null) {
+                if (toReturn.dataPoint == null || t.getThird() < shortestSqDist) {
+                    shortestSqDist = t.getThird();
+                    toReturn.dataPoint = t.getFirst();
+                    toReturn.series = s;
+                    toReturn.index = t.getSecond();;
                 }
             }
         }
 
-        return closest;
+        return toReturn;
     }
 
     /**

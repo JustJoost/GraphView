@@ -31,6 +31,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 
+import kotlin.Triple;
+
 /**
  * Basis implementation for series.
  * Used for series that are plotted on
@@ -49,7 +51,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     /**
      * holds the data
      */
-    final private List<E> mData = new ArrayList<E>();
+    final private List<E> mData = new ArrayList<>();
 
     /**
      * stores the used coordinates to find the
@@ -60,7 +62,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      *
      * will be filled while drawing via {@link #regDataPointLocInView(float, float, DataPointInterface)}
      */
-    private final Map<PointF, E> mDataPointsLocInView = new HashMap<PointF, E>();
+    private final Map<E, PointF> mDataPointsLocInView = new HashMap<>();
 
     /**
      * title for this series that can be displayed
@@ -256,6 +258,24 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
         }
     }
 
+    @Override
+    public E getNextDataPoint(int index) {
+        if (index < mData.size() - 1) {
+            return mData.get(index + 1);
+        } else {
+            return null;
+        }
+    }
+
+    @Override
+    public E getPreviousDataPoint(int index) {
+        if (index > 0) {
+            return mData.get(index - 1);
+        } else {
+            return null;
+        }
+    }
+
     /**
      * @return the title of the series
      */
@@ -371,7 +391,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      */
     @Override
     public void onTap(float x, float y) {
-        E p = findDataPoint(x, y).first;
+        E p = findDataPoint(x, y).getFirst();
         if (p != null) {
             if (mOnDataPointTapListener != null) mOnDataPointTapListener.onTap(this, p);
         }
@@ -383,39 +403,43 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      *
      * @param x pixel
      * @param y pixel
-     * @return pair of the data point or null if nothing was found, and the squared distance to the
-     *         coordinates of this data point
+     * @return Triple of the data point or null if nothing was found, the index of the datapoint,
+     *          and the squared distance to the coordinates of this data point
      */
-    public Pair<E, Float> findDataPoint(float x, float y) {
+    public Triple<E, Integer, Float> findDataPoint(float x, float y) {
         float shortestSqDist = Float.NaN;
         E closestDataPoint = null;
-        for (Map.Entry<PointF, E> entry : mDataPointsLocInView.entrySet()) {
-            float xDiff = entry.getKey().x - x;
-            float yDiff = entry.getKey().y - y;
+        int closestDataPointIndex = -1;
+        int index = 0;
+        for (E dp: mData) {
+            float xDiff = mDataPointsLocInView.get(dp).x - x;
+            float yDiff = mDataPointsLocInView.get(dp).y - y;
 
             float distance = xDiff*xDiff + yDiff*yDiff;
             if (closestDataPoint == null || distance < shortestSqDist) {
                 shortestSqDist = distance;
-                closestDataPoint = entry.getValue();
+                closestDataPoint = dp;
+                closestDataPointIndex = index;
             }
+            index++;
         }
         if (closestDataPoint != null && shortestSqDist < 120*120) {
-            return new Pair<>(closestDataPoint, shortestSqDist);
+            return new Triple<>(closestDataPoint, closestDataPointIndex, shortestSqDist);
         } else {
-            return new Pair<>(null, Float.NaN);
+            return new Triple<>(null, -1, Float.NaN);
         }
     }
 
     public E findDataPointAtX(float x) {
         float shortestDistance = Float.NaN;
         E shortest = null;
-        for (Map.Entry<PointF, E> entry : mDataPointsLocInView.entrySet()) {
-            float xDiff = entry.getKey().x - x;
+        for (E dp: mData) {
+            float xDiff = mDataPointsLocInView.get(dp).x - x;
 
             float distance = Math.abs(xDiff);
             if (shortest == null || distance < shortestDistance) {
                 shortestDistance = distance;
-                shortest = entry.getValue();
+                shortest = dp;
             }
         }
         if (shortest != null) {
@@ -437,7 +461,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
         // performance
         // TODO maybe invalidate after setting the listener
         if (mOnDataPointTapListener != null || isCursorMode()) {
-            mDataPointsLocInView.put(new PointF(x, y), dp);
+            mDataPointsLocInView.put(dp, new PointF(x, y));
         }
     }
 

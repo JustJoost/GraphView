@@ -34,6 +34,8 @@ import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
 
+import kotlin.Triple;
+
 /**
  * Series with Bars to visualize the data.
  * The Bars are always vertical.
@@ -474,12 +476,14 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
      * @return datapoint or null
      */
     @Override
-    public Pair<E, Float> findDataPoint(float x, float y) {
+    public Triple<E, Integer, Float> findDataPoint(float x, float y) {
+        int index = 0;
         for (Map.Entry<RectD, E> entry : mDataPoints.entrySet()) {
             if (x >= entry.getKey().left && x <= entry.getKey().right
                 && y >= entry.getKey().top && y <= entry.getKey().bottom) {
-                return new Pair<>(entry.getValue(), Float.NaN);
+                return new Triple<>(entry.getValue(), index, Float.NaN);
             }
+            index++;
         }
         return null;
     }

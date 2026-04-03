@@ -623,6 +623,24 @@ public class Viewport {
      */
     private Paint mBorderPaint;
 
+    public float getDataToViewFactorX() {
+        return mDatapointToViewFactorX;
+    }
+
+    public float getDataToViewFactorY() {
+        return mDatapointToViewFactorY;
+    }
+
+    private float mDatapointToViewFactorX;
+    private float mDatapointToViewFactorY;
+
+    void recalcDatapointToViewFactors() {
+        double dataRangeX = getMaxX(false) - getMinX(false);
+        double dataRangeY = getMaxY(false) - getMinY(false);
+
+        mDatapointToViewFactorX = (float) (mGraphView.getGraphContentWidth() / dataRangeX);
+        mDatapointToViewFactorY = (float) (mGraphView.getGraphContentHeight() / dataRangeY);
+    }
     /**
      * creates the viewport
      *
