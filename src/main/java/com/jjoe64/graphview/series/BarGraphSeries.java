@@ -18,10 +18,8 @@ package com.jjoe64.graphview.series;
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.RectF;
 import androidx.core.view.ViewCompat;
-import android.util.Log;
-import android.util.Pair;
+import kotlin.Pair;
 import android.view.animation.AccelerateInterpolator;
 
 import com.jjoe64.graphview.GraphView;
@@ -33,8 +31,6 @@ import java.util.Iterator;
 import java.util.Map;
 import java.util.SortedSet;
 import java.util.TreeSet;
-
-import kotlin.Triple;
 
 /**
  * Series with Bars to visualize the data.
@@ -476,14 +472,12 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
      * @return datapoint or null
      */
     @Override
-    public Triple<E, Integer, Float> findDataPoint(float x, float y) {
-        int index = 0;
+    public Pair<E, Float> findDataPoint(float x, float y) {
         for (Map.Entry<RectD, E> entry : mDataPoints.entrySet()) {
             if (x >= entry.getKey().left && x <= entry.getKey().right
                 && y >= entry.getKey().top && y <= entry.getKey().bottom) {
-                return new Triple<>(entry.getValue(), index, Float.NaN);
+                return new Pair<>(entry.getValue(), Float.NaN);
             }
-            index++;
         }
         return null;
     }

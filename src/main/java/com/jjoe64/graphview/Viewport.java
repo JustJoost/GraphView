@@ -1369,7 +1369,7 @@ public class Viewport {
        mMinimalViewport.set(minX, maxY, maxX, minY);
     }
 
-    public void zoomToFit(float paddingTop, float paddingBottom, float paddingLeft, float paddingRight,
+    public void zoomToFit(double paddingTop, double paddingBottom, double paddingLeft, double paddingRight,
                           boolean xFromZero, boolean yFromZero) {
         if (xFromZero) {
             setMinX(0);

@@ -39,6 +39,7 @@ import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
 
+import kotlin.Pair;
 import kotlin.Triple;
 
 /**
@@ -108,12 +109,6 @@ public class GraphView extends View implements Serializable {
             }
             return false;
         }
-    }
-
-    public class DataPointInfo {
-        public DataPointInterface dataPoint;
-        public Series series;
-        public int index;
     }
 
     /**
@@ -501,21 +496,18 @@ public class GraphView extends View implements Serializable {
         return (float) (graphTop - y) + graphHeight;
     }
 
-    protected DataPointInfo findDataPoint(float x, float y, boolean onlyEditable) {
+    protected DataPointInterface findDataPoint(float x, float y, boolean onlyEditable) {
         float shortestSqDist = Float.NaN;
-        DataPointInfo toReturn = new DataPointInfo();
-        toReturn.dataPoint = null;
+        DataPointInterface toReturn = null;
         for (Series s : mSeries) {
             if (onlyEditable && !(s.isEditable())) {
                 continue;
             }
-            Triple<DataPointInterface, Integer, Float> t = ((BaseSeries) s).findDataPoint(x, y);
+            Pair<DataPointInterface, Float> t = ((BaseSeries) s).findDataPoint(x, y);
             if (t.getFirst() != null) {
-                if (toReturn.dataPoint == null || t.getThird() < shortestSqDist) {
-                    shortestSqDist = t.getThird();
-                    toReturn.dataPoint = t.getFirst();
-                    toReturn.series = s;
-                    toReturn.index = t.getSecond();;
+                if (toReturn == null || t.getSecond() < shortestSqDist) {
+                    shortestSqDist = t.getSecond();
+                    toReturn = t.getFirst();
                 }
             }
         }

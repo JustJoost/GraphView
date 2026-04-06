@@ -16,6 +16,8 @@
  */
 package com.jjoe64.graphview.series;
 
+import java.util.Iterator;
+
 /**
  * interface of data points. Implement this in order
  * to use your class in {@link com.jjoe64.graphview.series.Series}.
@@ -26,13 +28,51 @@ package com.jjoe64.graphview.series;
  * @author jjoe64
  */
 public interface DataPointInterface {
+    public DataPointInterface clone();
+
     /**
      * @return the x value
      */
     public double getX();
 
     /**
-     * @return the y value
+     * return the y value
      */
     public double getY();
+
+    /**
+     * @param x the x value
+     */
+    public void setX(double x);
+
+    /**
+     * @param y the y value
+     */
+    public void setY(double y);
+
+    public DataPointInterface getNext();
+
+    public DataPointInterface getPrevious();
+
+    public boolean hasNext();
+
+    public boolean hasPrevious();
+
+    public void setNext(DataPointInterface next);
+
+    public void setPrevious(DataPointInterface previous);
+
+    public void insertAfter(DataPointInterface dataPoint);
+
+    public void insertBefore(DataPointInterface dataPoint);
+
+    public void remove();
+
+    public Iterator<DataPointInterface> rangedIterator(double start, double end);
+
+    public void setSeries(Series series);
+
+    public Series getSeries();
+
+    public int size();
 }
