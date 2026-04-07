@@ -40,7 +40,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import kotlin.Pair;
-import kotlin.Triple;
 
 /**
  * @author jjoe64
@@ -76,7 +75,7 @@ public class GraphView extends View implements Serializable {
      *
      * @author jjoe64
      */
-    private class TapDetector {
+    private static class TapDetector {
         /**
          * save the time of the last down event
          */
@@ -110,6 +109,41 @@ public class GraphView extends View implements Serializable {
             return false;
         }
     }
+
+    static class DataToViewParameters {
+        private double mFactorX;
+        private double mOffsetX;
+        private double mFactorY;
+        private double mOffsetY;
+        private double mFactorYSecondScale;
+        private double mOffsetYSecondScale;
+
+        public double getFactorX() {
+            return mFactorX;
+        }
+
+        public double getOffsetX() {
+            return mOffsetX;
+        }
+
+        public double getFactorY() {
+            return mFactorY;
+        }
+
+        public double getOffsetY() {
+            return mOffsetY;
+        }
+
+        public double getFactorYSecondScale() {
+            return mFactorYSecondScale;
+        }
+
+        public double getOffsetYSecondScale() {
+            return mOffsetYSecondScale;
+        }
+    }
+
+    private final DataToViewParameters mDataToViewParameters = new DataToViewParameters();
 
     /**
      * our series (this does not contain the series
@@ -172,6 +206,7 @@ public class GraphView extends View implements Serializable {
 
     /**
      * Initialize the GraphView view
+     *
      * @param context
      */
     public GraphView(Context context) {
@@ -244,6 +279,7 @@ public class GraphView extends View implements Serializable {
     /**
      * Add a new series to the graph. This will
      * automatically redraw the graph.
+     *
      * @param s the series to be added
      */
     public void addSeries(Series s) {
@@ -278,10 +314,10 @@ public class GraphView extends View implements Serializable {
      *                       to use "true" because this will
      *                       improve performance and prevent
      *                       a flickering.
-     * @param keepViewport true if you don't want that
-     *                     the viewport will be recalculated.
-     *                     It is recommended to use "true" for
-     *                     performance.
+     * @param keepViewport   true if you don't want that
+     *                       the viewport will be recalculated.
+     *                       It is recommended to use "true" for
+     *                       performance.
      */
     public void onDataChanged(boolean keepLabelsSize, boolean keepViewport) {
         // adjustSteps grid system
@@ -339,7 +375,7 @@ public class GraphView extends View implements Serializable {
             canvas.drawText("GraphView: No Preview available", canvas.getWidth() / 2, canvas.getHeight() / 2, mPreviewPaint);
         } else {
             drawGraphElements(canvas);
-            mViewport.recalcDatapointToViewFactors();
+            recalcDatapointToViewPars();
         }
     }
 
@@ -364,9 +400,9 @@ public class GraphView extends View implements Serializable {
     /**
      * Calculates the height of the title.
      *
-     * @return  the actual size of the title.
-     *          if there is no title, 0 will be
-     *          returned.
+     * @return the actual size of the title.
+     * if there is no title, 0 will be
+     * returned.
      */
     protected int getTitleHeight() {
         if (mTitle != null && mTitle.length() > 0) {
@@ -401,9 +437,9 @@ public class GraphView extends View implements Serializable {
     }
 
     /**
-     * @return  the space on the left side of the
-     *          view from the left border to the
-     *          beginning of the graph viewport.
+     * @return the space on the left side of the
+     * view from the left border to the
+     * beginning of the graph viewport.
      */
     public int getGraphContentLeft() {
         int border = getGridLabelRenderer().getStyles().padding;
@@ -411,9 +447,9 @@ public class GraphView extends View implements Serializable {
     }
 
     /**
-     * @return  the space on the top of the
-     *          view from the top border to the
-     *          beginning of the graph viewport.
+     * @return the space on the top of the
+     * view from the top border to the
+     * beginning of the graph viewport.
      */
     public int getGraphContentTop() {
         int border = getGridLabelRenderer().getStyles().padding + getTitleHeight();
@@ -421,7 +457,7 @@ public class GraphView extends View implements Serializable {
     }
 
     /**
-     * @return  the height of the graph viewport.
+     * @return the height of the graph viewport.
      */
     public int getGraphContentHeight() {
         int border = getGridLabelRenderer().getStyles().padding;
@@ -431,7 +467,7 @@ public class GraphView extends View implements Serializable {
     }
 
     /**
-     * @return  the width of the graph viewport.
+     * @return the width of the graph viewport.
      */
     public int getGraphContentWidth() {
         int border = getGridLabelRenderer().getStyles().padding;
@@ -443,27 +479,32 @@ public class GraphView extends View implements Serializable {
         return graphwidth;
     }
 
+    void recalcDatapointToViewPars() {
+        double dataRangeX = mViewport.getMaxX(false) - mViewport.getMinX(false);
+        double dataRangeY = mViewport.getMaxY(false) - mViewport.getMinY(false);
+
+        mDataToViewParameters.mFactorX = getGraphContentWidth() / dataRangeX;
+        mDataToViewParameters.mFactorY = -getGraphContentHeight() / dataRangeY;
+        mDataToViewParameters.mOffsetX = -mViewport.getMinX(false) * mDataToViewParameters.mFactorX
+                + getGraphContentLeft() + 1;
+        mDataToViewParameters.mOffsetY = -mViewport.getMinY(false) * mDataToViewParameters.mFactorY
+                + getGraphContentHeight() + getGraphContentTop();
+    }
+
+    public DataToViewParameters getDataToViewParameters() {
+        return mDataToViewParameters;
+    }
+
     /**
      * Get x coordinate value of the datapoint in view coordinates (as opposed to the actual x
      * coordinate of the underlying data).
      *
      * @param dp
-     * @param series
-     * @param forceReCalc if false, the cache is used
+     *
      * @return x coordinate value of the datapoint in view coordinates
      */
-    public float getDataPointXInView(DataPointInterface dp, Series<?> series, Boolean forceReCalc) {
-        // TODO: if forceReCalc is false, look up in cache
-        float graphWidth = getGraphContentWidth();
-        float graphLeft = getGraphContentLeft();
-
-        // Bounds of x-axis values
-        double maxX = mViewport.getMaxX(false);
-        double minX = mViewport.getMinX(false);
-
-        double x = graphWidth * (dp.getX() - minX) / (maxX - minX);
-
-        return (float) x + (graphLeft + 1);
+    public float getPointXInView(DataPointInterface dp) {
+        return (float) (dp.getX()*mDataToViewParameters.getFactorX() + mDataToViewParameters.getOffsetX());
     }
 
     /**
@@ -471,29 +512,15 @@ public class GraphView extends View implements Serializable {
      * coordinate of the underlying data).
      *
      * @param dp
-     * @param series
-     * @param forceReCalc if false, the cache is used
+     *
      * @return y coordinate value of the datapoint in view coordinates
      */
-    public float getDataPointYInView(DataPointInterface dp, Series<?> series, Boolean forceReCalc) {
-        // TODO: if forceReCalc is false, look up in cache
-        float graphHeight = getGraphContentHeight();
-        float graphTop = getGraphContentTop();
+    public float getPointYInView(DataPointInterface dp) {
+        return (float) (dp.getY()*mDataToViewParameters.getFactorY() + mDataToViewParameters.getOffsetY());
+    }
 
-        // Bounds of y-axis values
-        double maxY;
-        double minY;
-        if (mSecondScale != null) {
-            maxY = mSecondScale.getMaxY(false);
-            minY = mSecondScale.getMinY(false);
-        } else {
-            maxY = mViewport.getMaxY(false);
-            minY = mViewport.getMinY(false);
-        }
-
-        double y = graphHeight * (dp.getY() - minY) / (maxY - minY);
-
-        return (float) (graphTop - y) + graphHeight;
+    public PointF getPointInView(DataPointInterface dp) {
+        return new PointF(getPointXInView(dp), getPointYInView(dp));
     }
 
     protected DataPointInterface findDataPoint(float x, float y, boolean onlyEditable) {
@@ -503,7 +530,7 @@ public class GraphView extends View implements Serializable {
             if (onlyEditable && !(s.isEditable())) {
                 continue;
             }
-            Pair<DataPointInterface, Float> t = ((BaseSeries) s).findDataPoint(x, y);
+            Pair<DataPointInterface, Float> t = ((BaseSeries) s).findDataPoint(x, y, this);
             if (t.getFirst() != null) {
                 if (toReturn == null || t.getSecond() < shortestSqDist) {
                     shortestSqDist = t.getSecond();
@@ -529,11 +556,11 @@ public class GraphView extends View implements Serializable {
         // is it a click?
         if (mTapDetector.onTouchEvent(event)) {
             for (Series s : mSeries) {
-                s.onTap(event.getX(), event.getY());
+                s.onTap(event.getX(), event.getY(), this);
             }
             if (mSecondScale != null) {
                 for (Series s : mSecondScale.getSeries()) {
-                    s.onTap(event.getX(), event.getY());
+                    s.onTap(event.getX(), event.getY(), this);
                 }
             }
         }
@@ -568,8 +595,8 @@ public class GraphView extends View implements Serializable {
     }
 
     /**
-     * @return  the title that will be shown
-     *          above the graph.
+     * @return the title that will be shown
+     * above the graph.
      */
     public String getTitle() {
         return mTitle;

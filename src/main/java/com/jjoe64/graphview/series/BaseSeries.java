@@ -17,17 +17,13 @@
 package com.jjoe64.graphview.series;
 
 import android.graphics.Canvas;
-import android.graphics.PointF;
 
 import com.jjoe64.graphview.GraphView;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 
 import kotlin.Pair;
 
@@ -52,17 +48,6 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      */
     private E mDataHead;
     private E mDataTail;
-
-    /**
-     * stores the used coordinates to find the
-     * corresponding data point on a tap
-     * <p>
-     * Key => x/y pixel
-     * Value => Plotted Datapoint
-     * <p>
-     * will be filled while drawing via {@link #regDataPointLocInView(float, float, DataPointInterface)}
-     */
-    private final Map<E, PointF> mDataPointsLocInView = new HashMap<>();
 
     /**
      * title for this series that can be displayed
@@ -131,6 +116,13 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     // endregion
 
     // region Getters and setters
+    public DataPointInterface getDataHead() {
+        return mDataHead;
+    }
+
+    public DataPointInterface getDataTail() {
+        return mDataTail;
+    }
 
     /**
      * @return the lowest x value, or 0 if there is no data
@@ -144,11 +136,8 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      * @return the highest x value, or 0 if there is no data
      */
     public double getHighestValueX() {
-        if (mDataHead == null) return 0d;
-        DataPointInterface current = mDataHead;
-        while (current.hasNext()) current = current.getNext();
-
-        return current.getX();
+        if (mDataTail == null) return 0d;
+        return mDataTail.getX();
     }
 
     /**
@@ -293,8 +282,8 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      * @param y pixel
      */
     @Override
-    public void onTap(float x, float y) {
-        E p = findDataPoint(x, y).getFirst();
+    public void onTap(float x, float y, GraphView gv) {
+        E p = findDataPoint(x, y, gv).getFirst();
         if (p != null) {
             if (mOnDataPointTapListener != null) mOnDataPointTapListener.onTap(this, p);
         }
@@ -309,13 +298,13 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      * @return Triple of the data point or null if nothing was found, the index of the datapoint,
      * and the squared distance to the coordinates of this data point
      */
-    public Pair<E, Float> findDataPoint(float x, float y) {
+    public Pair<E, Float> findDataPoint(float x, float y, GraphView gv) {
         float shortestSqDist = Float.NaN;
         E closestDataPoint = null;
         E current = mDataHead;
-        while (current.hasNext()) {
-            float xDiff = mDataPointsLocInView.get(current).x - x;
-            float yDiff = mDataPointsLocInView.get(current).y - y;
+        while (current != null) {
+            float xDiff = gv.getPointXInView(current) - x;
+            float yDiff = gv.getPointYInView(current) - y;
 
             float distance = xDiff * xDiff + yDiff * yDiff;
             if (closestDataPoint == null || distance < shortestSqDist) {
@@ -331,12 +320,12 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
         }
     }
 
-    public E findDataPointAtX(float x) {
+    public E findDataPointAtX(float x, GraphView gv) {
         float shortestDistance = Float.NaN;
         E shortest = null;
         E current = mDataHead;
-        while (current.hasNext()) {
-            float xDiff = mDataPointsLocInView.get(current).x - x;
+        while (current != null) {
+            float xDiff = gv.getPointXInView(current) - x;
 
             float distance = Math.abs(xDiff);
             if (shortest == null || distance < shortestDistance) {
@@ -353,21 +342,6 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
         return null;
     }
 
-    /**
-     * register the datapoint to find it at a tap
-     *
-     * @param x  pixel
-     * @param y  pixel
-     * @param dp the data point to save
-     */
-    protected void regDataPointLocInView(float x, float y, E dp) {
-        // performance
-        // TODO maybe invalidate after setting the listener
-        if (mOnDataPointTapListener != null || isCursorMode()) {
-            mDataPointsLocInView.put(dp, new PointF(x, y));
-        }
-    }
-
     private boolean isCursorMode() {
         if (mIsCursorModeCache != null) {
             return mIsCursorModeCache;
@@ -378,13 +352,6 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
             }
         }
         return mIsCursorModeCache = false;
-    }
-
-    /**
-     * clears the cached data point coordinates
-     */
-    protected void resetDataPoints() {
-        mDataPointsLocInView.clear();
     }
 
     /**

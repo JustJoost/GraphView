@@ -145,8 +145,6 @@ public class PointsGraphSeries<E extends DataPointInterface> extends BaseSeries<
      */
     @Override
     public void draw(GraphView graphView, Canvas canvas, boolean isSecondScale) {
-        resetDataPoints();
-
         // get data
         double maxX = graphView.getViewport().getMaxX(false);
         double minX = graphView.getViewport().getMinX(false);
@@ -214,7 +212,6 @@ public class PointsGraphSeries<E extends DataPointInterface> extends BaseSeries<
             
             float endX = (float) x + (graphLeft + 1);
             float endY = (float) (graphTop - y) + graphHeight;
-            regDataPointLocInView(endX, endY, value);
 
             // draw data point
             if (!overdraw) {

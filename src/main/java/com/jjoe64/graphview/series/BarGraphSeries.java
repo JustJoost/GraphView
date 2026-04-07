@@ -158,8 +158,6 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
         }
         mPaint.setTextSize(mValuesOnTopSize);
 
-        resetDataPoints();
-        
         // get data
         double maxX = graphView.getViewport().getMaxX(false);
         double minX = graphView.getViewport().getMinX(false);
@@ -456,14 +454,6 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
     }
 
     /**
-     * resets the cached coordinates of the bars
-     */
-    @Override
-    protected void resetDataPoints() {
-        mDataPoints.clear();
-    }
-
-    /**
      * find the corresponding data point by
      * coordinates.
      *
@@ -472,7 +462,7 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
      * @return datapoint or null
      */
     @Override
-    public Pair<E, Float> findDataPoint(float x, float y) {
+    public Pair<E, Float> findDataPoint(float x, float y, GraphView gv) {
         for (Map.Entry<RectD, E> entry : mDataPoints.entrySet()) {
             if (x >= entry.getKey().left && x <= entry.getKey().right
                 && y >= entry.getKey().top && y <= entry.getKey().bottom) {
