@@ -112,8 +112,10 @@ public class GraphView extends View implements Serializable {
 
     static class DataToViewParameters {
         private double mFactorX;
+        private double mInvFactorX;
         private double mOffsetX;
         private double mFactorY;
+        private double mInvFactorY;
         private double mOffsetY;
         private double mFactorYSecondScale;
         private double mOffsetYSecondScale;
@@ -122,12 +124,20 @@ public class GraphView extends View implements Serializable {
             return mFactorX;
         }
 
+        public double getInvFactorX() {
+            return mInvFactorX;
+        }
+
         public double getOffsetX() {
             return mOffsetX;
         }
 
         public double getFactorY() {
             return mFactorY;
+        }
+
+        public double getInvFactorY() {
+            return mInvFactorY;
         }
 
         public double getOffsetY() {
@@ -143,6 +153,7 @@ public class GraphView extends View implements Serializable {
         }
     }
 
+    // region Fields and initialization
     private final DataToViewParameters mDataToViewParameters = new DataToViewParameters();
 
     /**
@@ -268,13 +279,7 @@ public class GraphView extends View implements Serializable {
         mStyles.titleColor = mGridLabelRenderer.getHorizontalLabelsColor();
         mStyles.titleTextSize = mGridLabelRenderer.getTextSize();
     }
-
-    /**
-     * @return the renderer for the grid and labels
-     */
-    public GridLabelRenderer getGridLabelRenderer() {
-        return mGridLabelRenderer;
-    }
+    // endregion
 
     /**
      * Add a new series to the graph. This will
@@ -300,6 +305,7 @@ public class GraphView extends View implements Serializable {
         return mSeries;
     }
 
+    // region Drawing and support
     /**
      * call this to let the graph redraw and
      * recalculate the viewport.
@@ -327,6 +333,7 @@ public class GraphView extends View implements Serializable {
         }
         mGridLabelRenderer.invalidate(keepLabelsSize, keepViewport);
         postInvalidate();
+        recalcDatapointToViewPars();
     }
 
     /**
@@ -375,7 +382,6 @@ public class GraphView extends View implements Serializable {
             canvas.drawText("GraphView: No Preview available", canvas.getWidth() / 2, canvas.getHeight() / 2, mPreviewPaint);
         } else {
             drawGraphElements(canvas);
-            recalcDatapointToViewPars();
         }
     }
 
@@ -413,11 +419,10 @@ public class GraphView extends View implements Serializable {
     }
 
     /**
-     * @return the viewport of the Graph.
-     * @see com.jjoe64.graphview.Viewport
+     * @return the renderer for the grid and labels
      */
-    public Viewport getViewport() {
-        return mViewport;
+    public GridLabelRenderer getGridLabelRenderer() {
+        return mGridLabelRenderer;
     }
 
     /**
@@ -479,12 +484,40 @@ public class GraphView extends View implements Serializable {
         return graphwidth;
     }
 
+    /**
+     * @return the legend renderer.
+     * @see com.jjoe64.graphview.LegendRenderer
+     */
+    public LegendRenderer getLegendRenderer() {
+        return mLegendRenderer;
+    }
+
+    /**
+     * use a specific legend renderer
+     *
+     * @param mLegendRenderer the new legend renderer
+     */
+    public void setLegendRenderer(LegendRenderer mLegendRenderer) {
+        this.mLegendRenderer = mLegendRenderer;
+    }
+    // endregion
+
+    /**
+     * @return the viewport of the Graph.
+     * @see com.jjoe64.graphview.Viewport
+     */
+    public Viewport getViewport() {
+        return mViewport;
+    }
+
     void recalcDatapointToViewPars() {
         double dataRangeX = mViewport.getMaxX(false) - mViewport.getMinX(false);
         double dataRangeY = mViewport.getMaxY(false) - mViewport.getMinY(false);
 
         mDataToViewParameters.mFactorX = getGraphContentWidth() / dataRangeX;
+        mDataToViewParameters.mInvFactorX = 1.0 / mDataToViewParameters.mFactorX;
         mDataToViewParameters.mFactorY = -getGraphContentHeight() / dataRangeY;
+        mDataToViewParameters.mInvFactorY = 1.0 / mDataToViewParameters.mFactorY;
         mDataToViewParameters.mOffsetX = -mViewport.getMinX(false) * mDataToViewParameters.mFactorX
                 + getGraphContentLeft() + 1;
         mDataToViewParameters.mOffsetY = -mViewport.getMinY(false) * mDataToViewParameters.mFactorY
@@ -500,11 +533,10 @@ public class GraphView extends View implements Serializable {
      * coordinate of the underlying data).
      *
      * @param dp
-     *
      * @return x coordinate value of the datapoint in view coordinates
      */
     public float getPointXInView(DataPointInterface dp) {
-        return (float) (dp.getX()*mDataToViewParameters.getFactorX() + mDataToViewParameters.getOffsetX());
+        return (float) (dp.getX() * mDataToViewParameters.getFactorX() + mDataToViewParameters.getOffsetX());
     }
 
     /**
@@ -512,11 +544,10 @@ public class GraphView extends View implements Serializable {
      * coordinate of the underlying data).
      *
      * @param dp
-     *
      * @return y coordinate value of the datapoint in view coordinates
      */
     public float getPointYInView(DataPointInterface dp) {
-        return (float) (dp.getY()*mDataToViewParameters.getFactorY() + mDataToViewParameters.getOffsetY());
+        return (float) (dp.getY() * mDataToViewParameters.getFactorY() + mDataToViewParameters.getOffsetY());
     }
 
     public PointF getPointInView(DataPointInterface dp) {
@@ -575,23 +606,6 @@ public class GraphView extends View implements Serializable {
     public void computeScroll() {
         super.computeScroll();
         mViewport.computeScroll();
-    }
-
-    /**
-     * @return the legend renderer.
-     * @see com.jjoe64.graphview.LegendRenderer
-     */
-    public LegendRenderer getLegendRenderer() {
-        return mLegendRenderer;
-    }
-
-    /**
-     * use a specific legend renderer
-     *
-     * @param mLegendRenderer the new legend renderer
-     */
-    public void setLegendRenderer(LegendRenderer mLegendRenderer) {
-        this.mLegendRenderer = mLegendRenderer;
     }
 
     /**

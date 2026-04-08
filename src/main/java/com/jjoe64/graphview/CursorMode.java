@@ -218,8 +218,9 @@ public class CursorMode {
         } else {
             editDelta.x = mPosX - mGraphView.getPointXInView(mPointBeingEdited);
         }
-        if (mPosY > mGraphView.getGraphContentHeight() + mStyles.padding && mPosY < mGraphView.getHeight()) {
-            editDelta.y = mGraphView.getGraphContentHeight() + mStyles.padding - mGraphView.getPointYInView(mPointBeingEdited);
+        int contentHeight = mGraphView.getGraphContentHeight() + mStyles.padding + 1;
+        if (mPosY > contentHeight && mPosY < mGraphView.getHeight()) {
+            editDelta.y = contentHeight - mGraphView.getPointYInView(mPointBeingEdited);
         } else if (mPosY >= mGraphView.getHeight()) {
             outOfBounds = true;
         } else if (mPosY < mStyles.padding && mPosY > 0f) {
@@ -268,9 +269,11 @@ public class CursorMode {
                 break;
             case DRAG:
                 if (editDelta.x != 0f) {
-                    mPointBeingEdited.setX(mPointBeingEdited.getX() + editDelta.x / mGraphView.getDataToViewParameters().getFactorX());
+                    mPointBeingEdited.setX(mPointBeingEdited.getX() +
+                            editDelta.x * mGraphView.getDataToViewParameters().getInvFactorX());
                 } else if (editDelta.y != 0f) {
-                    mPointBeingEdited.setY(mPointBeingEdited.getY() + editDelta.y / mGraphView.getDataToViewParameters().getFactorY());
+                    mPointBeingEdited.setY(mPointBeingEdited.getY() +
+                            editDelta.y * mGraphView.getDataToViewParameters().getInvFactorY());
                 }
                 mState = State.EDIT;
                 break;
@@ -414,24 +417,24 @@ public class CursorMode {
     }
 
     private void updateControlsCenter(float padding) {
-        float graphLeft = mGraphView.getGraphContentLeft();
-        float graphHeight = mGraphView.getGraphContentHeight();
-        float graphWidth = mGraphView.getGraphContentWidth();
+//        float graphLeft = mGraphView.getGraphContentLeft();
+//        float graphHeight = mGraphView.getGraphContentHeight();
+//        float graphWidth = mGraphView.getGraphContentWidth();
 
         mControlsCenterX = mGraphView.getPointXInView(mPointBeingEdited);
         mControlsCenterY = mGraphView.getPointYInView(mPointBeingEdited);
 
         // Ensure controls remain in graph area
-        if (mControlsCenterX > graphLeft + graphWidth - mEditParameters.controlBoxWidth / 2 - padding) {
-            mControlsCenterX = graphLeft + graphWidth - mEditParameters.controlBoxWidth / 2 - padding;
-        } else if (mControlsCenterX < graphLeft + mEditParameters.controlBoxWidth / 2 + padding) {
-            mControlsCenterX = graphLeft + mEditParameters.controlBoxWidth / 2 + padding;
-        }
-        if (mControlsCenterY > graphHeight - mEditParameters.controlBoxHeight / 2) {
-            mControlsCenterY = graphHeight - mEditParameters.controlBoxHeight / 2;
-        } else if (mControlsCenterY < mEditParameters.controlBoxHeight / 2 + padding) {
-            mControlsCenterY = mEditParameters.controlBoxHeight / 2 + padding;
-        }
+//        if (mControlsCenterX > graphLeft + graphWidth - mEditParameters.controlBoxWidth / 2 - padding) {
+//            mControlsCenterX = graphLeft + graphWidth - mEditParameters.controlBoxWidth / 2 - padding;
+//        } else if (mControlsCenterX < graphLeft + mEditParameters.controlBoxWidth / 2 + padding) {
+//            mControlsCenterX = graphLeft + mEditParameters.controlBoxWidth / 2 + padding;
+//        }
+//        if (mControlsCenterY > graphHeight - mEditParameters.controlBoxHeight / 2) {
+//            mControlsCenterY = graphHeight - mEditParameters.controlBoxHeight / 2;
+//        } else if (mControlsCenterY < mEditParameters.controlBoxHeight / 2 + padding) {
+//            mControlsCenterY = mEditParameters.controlBoxHeight / 2 + padding;
+//        }
     }
 
     protected void drawControls(Canvas canvas) {
@@ -440,7 +443,7 @@ public class CursorMode {
         float arrowDist = 75.f;
         float dpX = mGraphView.getPointXInView(mPointBeingEdited);
         float dpY = mGraphView.getPointYInView(mPointBeingEdited);
-        float graphHeight = mGraphView.getGraphContentHeight();
+//        float graphHeight = mGraphView.getGraphContentHeight();
         float graphLeft = mGraphView.getGraphContentLeft();
 
         updateControlsCenter(arrowSize);
@@ -479,7 +482,7 @@ public class CursorMode {
             xLabel = dpX + editDelta.x + mStyles.textSize / 2;
             yLabel = arrowY + mStyles.textSize;
             newValText = mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(
-                    mPointBeingEdited.getX() + editDelta.x / mGraphView.getDataToViewParameters().getFactorX(), true);
+                    mPointBeingEdited.getX() + editDelta.x * mGraphView.getDataToViewParameters().getInvFactorX(), true);
             float textWidth = mTextPaint.measureText(newValText);
             if (editDelta.x > 0) {
                 xLabel -= textWidth + 3 * arrowSize;
@@ -501,7 +504,7 @@ public class CursorMode {
                 yLabel = dpY + editDelta.y + textHeight + arrowSize;
             }
             newValText = mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(
-                    mPointBeingEdited.getY() + editDelta.y / mGraphView.getDataToViewParameters().getFactorY(), true);
+                    mPointBeingEdited.getY() + editDelta.y * mGraphView.getDataToViewParameters().getInvFactorY(), true);
         }
 
         canvas.drawPath(arrowUp, arrowPaint);
