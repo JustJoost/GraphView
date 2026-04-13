@@ -134,7 +134,7 @@ public class CursorMode {
 
     void idleOrSelectOnDown() {
         Map<BaseSeries, DataPointInterface> newCurrentSelection = findCurrentDataPointsAtX();
-        if (!newCurrentSelection.equals(mCurrentSelection)) {
+        if (newCurrentSelection.isEmpty() || !newCurrentSelection.equals(mCurrentSelection)) {
             mCurrentSelection.clear();
             mCurrentSelection.putAll(newCurrentSelection);
             mState = State.SELECT;

@@ -333,7 +333,6 @@ public class GraphView extends View implements Serializable {
         }
         mGridLabelRenderer.invalidate(keepLabelsSize, keepViewport);
         postInvalidate();
-        recalcDatapointToViewPars();
     }
 
     /**
@@ -382,6 +381,7 @@ public class GraphView extends View implements Serializable {
             canvas.drawText("GraphView: No Preview available", canvas.getWidth() / 2, canvas.getHeight() / 2, mPreviewPaint);
         } else {
             drawGraphElements(canvas);
+            recalcDatapointToViewPars();
         }
     }
 
