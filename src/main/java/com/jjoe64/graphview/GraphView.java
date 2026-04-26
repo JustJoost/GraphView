@@ -33,6 +33,7 @@ import android.view.View;
 import com.jjoe64.graphview.series.BaseSeries;
 import com.jjoe64.graphview.series.DataPointInterface;
 import com.jjoe64.graphview.series.Series;
+import com.josoft.collections.CircBuffer;
 
 import java.io.ByteArrayOutputStream;
 import java.io.Serializable;
@@ -554,14 +555,15 @@ public class GraphView extends View implements Serializable {
         return new PointF(getPointXInView(dp), getPointYInView(dp));
     }
 
-    protected DataPointInterface findDataPoint(float x, float y, boolean onlyEditable) {
+    protected CircBuffer<DataPointInterface>.CircBufferIterator findDataPoint(float x, float y, boolean onlyEditable) {
         float shortestSqDist = Float.NaN;
-        DataPointInterface toReturn = null;
+        CircBuffer<DataPointInterface>.CircBufferIterator toReturn = null;
         for (Series s : mSeries) {
             if (onlyEditable && !(s.isEditable())) {
                 continue;
             }
-            Pair<DataPointInterface, Float> t = ((BaseSeries) s).findDataPoint(x, y, this);
+            Pair<CircBuffer<DataPointInterface>.CircBufferIterator, Float> t =
+                    ((BaseSeries) s).findDataPoint(x, y, this);
             if (t.getFirst() != null) {
                 if (toReturn == null || t.getSecond() < shortestSqDist) {
                     shortestSqDist = t.getSecond();

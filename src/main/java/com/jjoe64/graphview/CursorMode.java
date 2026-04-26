@@ -15,6 +15,7 @@ import android.view.MotionEvent;
 import com.jjoe64.graphview.series.BaseSeries;
 import com.jjoe64.graphview.series.DataPointInterface;
 import com.jjoe64.graphview.series.Series;
+import com.josoft.collections.CircBuffer;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -55,14 +56,14 @@ public class CursorMode {
     protected final GraphView mGraphView;
     protected float mPosX;
     protected float mPosY;
-    protected final Map<BaseSeries, DataPointInterface> mCurrentSelection;
+    protected final Map<BaseSeries, CircBuffer<DataPointInterface>.CircBufferIterator> mCurrentSelection;
     protected final Paint mRectPaint;
     protected final Paint mTextPaint;
     protected double mCurrentSelectionX;
     protected double mCurrentSelectionY;
     protected Styles mStyles;
     protected int cachedLegendWidth;
-    protected DataPointInterface mPointBeingEdited = null;
+    protected CircBuffer<DataPointInterface>.CircBufferIterator mPointBeingEdited = null;
     private State mState = State.IDLE;
     private PointF editDelta = new PointF();
     private float mControlsCenterX;
@@ -133,17 +134,20 @@ public class CursorMode {
     }
 
     void idleOrSelectOnDown() {
-        Map<BaseSeries, DataPointInterface> newCurrentSelection = findCurrentDataPointsAtX();
+        Map<BaseSeries, CircBuffer<DataPointInterface>.CircBufferIterator> newCurrentSelection =
+                findCurrentDataPointsAtX();
         if (newCurrentSelection.isEmpty() || !newCurrentSelection.equals(mCurrentSelection)) {
             mCurrentSelection.clear();
             mCurrentSelection.putAll(newCurrentSelection);
             mState = State.SELECT;
         } else {
-            DataPointInterface dpTapped = mGraphView.findDataPoint(mPosX, mPosY, true);
+            CircBuffer<DataPointInterface>.CircBufferIterator dpTapped =
+                    mGraphView.findDataPoint(mPosX, mPosY, true);
             // Point found can differ from the one that was selected before, because new data point
             // was selected based on x AND y, as opposed to just x. In this case, it was not a 'second'
             // tap, do not start editing
-            if (dpTapped != null && dpTapped.equals(mCurrentSelection.get((BaseSeries<DataPointInterface>) dpTapped.getSeries()))) {
+            if (dpTapped != null && dpTapped.equals(mCurrentSelection.get(
+                    (BaseSeries<DataPointInterface>) dpTapped.peek(0).getSeries()))) {
                 mPointBeingEdited = dpTapped;
                 mState = State.EDIT;
                 updateControlsCenter(mEditParameters.arrowSize);
@@ -176,7 +180,8 @@ public class CursorMode {
         mPosY = e.getY();
         switch (mState) {
             case SELECT:
-                Map<BaseSeries, DataPointInterface> newCurrentSelection = findCurrentDataPointsAtX();
+                Map<BaseSeries, CircBuffer<DataPointInterface>.CircBufferIterator> newCurrentSelection =
+                        findCurrentDataPointsAtX();
                 if (!newCurrentSelection.equals(mCurrentSelection)) {
                     mCurrentSelection.clear();
                     mCurrentSelection.putAll(newCurrentSelection);
@@ -191,9 +196,10 @@ public class CursorMode {
 
     void dragOnMove() {
         // Limit drag arrows, y to graph area and x to between previous and next point
-        DataPointInterface prev = mPointBeingEdited.getPrevious();
-        DataPointInterface next = mPointBeingEdited.getNext();
-        float xIncrement = (float) (mPointBeingEdited.getSeries().getEditIncrementX() * mGraphView.getDataToViewParameters().getFactorX());
+        DataPointInterface prev = mPointBeingEdited.peek(-1);
+        DataPointInterface next = mPointBeingEdited.peek(1);
+        float xIncrement = (float) (mPointBeingEdited.peek(0).getSeries().getEditIncrementX()
+                * mGraphView.getDataToViewParameters().getFactorX());
         float minX;
         boolean outOfBounds = false;
         if (prev != null) {
@@ -208,27 +214,27 @@ public class CursorMode {
             maxX = mGraphView.getGraphContentLeft() + mGraphView.getGraphContentWidth();
         }
         if (mPosX < minX && mPosX > 0f) {
-            editDelta.x = minX - mGraphView.getPointXInView(mPointBeingEdited);
+            editDelta.x = minX - mGraphView.getPointXInView(mPointBeingEdited.peek(0));
         } else if (mPosX <= 0f) {
             outOfBounds = true;
         } else if (mPosX > maxX && mPosX < mGraphView.getWidth()) {
-            editDelta.x = maxX - mGraphView.getPointXInView(mPointBeingEdited);
+            editDelta.x = maxX - mGraphView.getPointXInView(mPointBeingEdited.peek(0));
         } else if (mPosX >= mGraphView.getWidth()) {
             outOfBounds = true;
         } else {
-            editDelta.x = mPosX - mGraphView.getPointXInView(mPointBeingEdited);
+            editDelta.x = mPosX - mGraphView.getPointXInView(mPointBeingEdited.peek(0));
         }
         int contentHeight = mGraphView.getGraphContentHeight() + mStyles.padding + 1;
         if (mPosY > contentHeight && mPosY < mGraphView.getHeight()) {
-            editDelta.y = contentHeight - mGraphView.getPointYInView(mPointBeingEdited);
+            editDelta.y = contentHeight - mGraphView.getPointYInView(mPointBeingEdited.peek(0));
         } else if (mPosY >= mGraphView.getHeight()) {
             outOfBounds = true;
         } else if (mPosY < mStyles.padding && mPosY > 0f) {
-            editDelta.y = mStyles.padding - mGraphView.getPointYInView(mPointBeingEdited);
+            editDelta.y = mStyles.padding - mGraphView.getPointYInView(mPointBeingEdited.peek(0));
         } else if (mPosY <= 0f) {
             outOfBounds = true;
         } else {
-            editDelta.y = mPosY - mGraphView.getPointYInView(mPointBeingEdited);
+            editDelta.y = mPosY - mGraphView.getPointYInView(mPointBeingEdited.peek(0));
         }
         if (outOfBounds) {
             editDelta.x = 0f;
@@ -245,7 +251,8 @@ public class CursorMode {
         } else {
             editDelta.x = 0;
             shownArrowSize = Math.abs(editDelta.y);
-            increment = mPointBeingEdited.getSeries().getEditIncrementY() * -mGraphView.getDataToViewParameters().getFactorY();
+            increment = mPointBeingEdited.peek(0).getSeries().getEditIncrementY()
+                    * -mGraphView.getDataToViewParameters().getFactorY();
         }
 
         // Let arrows change in steps of 'increment'
@@ -269,10 +276,10 @@ public class CursorMode {
                 break;
             case DRAG:
                 if (editDelta.x != 0f) {
-                    mPointBeingEdited.setX(mPointBeingEdited.getX() +
+                    mPointBeingEdited.peek(0).setX(mPointBeingEdited.peek(0).getX() +
                             editDelta.x * mGraphView.getDataToViewParameters().getInvFactorX());
                 } else if (editDelta.y != 0f) {
-                    mPointBeingEdited.setY(mPointBeingEdited.getY() +
+                    mPointBeingEdited.peek(0).setY(mPointBeingEdited.peek(0).getY() +
                             editDelta.y * mGraphView.getDataToViewParameters().getInvFactorY());
                 }
                 mState = State.EDIT;
@@ -291,8 +298,8 @@ public class CursorMode {
         }
 
         // selection
-        for (Map.Entry<BaseSeries, DataPointInterface> entry : mCurrentSelection.entrySet()) {
-            entry.getKey().drawSelection(mGraphView, canvas, false, entry.getValue());
+        for (Map.Entry<BaseSeries, CircBuffer<DataPointInterface>.CircBufferIterator> entry : mCurrentSelection.entrySet()) {
+            entry.getKey().drawSelection(mGraphView, canvas, false, entry.getValue().peek(0));
         }
 
         if (!mCurrentSelection.isEmpty()) {
@@ -335,8 +342,9 @@ public class CursorMode {
 
             if (legendWidth == 0) {
                 Rect textBounds = new Rect();
-                for (Map.Entry<BaseSeries, DataPointInterface> entry : mCurrentSelection.entrySet()) {
-                    String txt = getTextForSeries(entry.getKey(), entry.getValue());
+                for (Map.Entry<BaseSeries, CircBuffer<DataPointInterface>.CircBufferIterator> entry :
+                        mCurrentSelection.entrySet()) {
+                    String txt = getTextForSeries(entry.getKey(), entry.getValue().peek(0));
                     mTextPaint.getTextBounds(txt, 0, txt.length(), textBounds);
                     legendWidth = Math.max(legendWidth, textBounds.width());
                 }
@@ -377,10 +385,16 @@ public class CursorMode {
         mTextPaint.setFakeBoldText(false);
 
         int i = 1;
-        for (Map.Entry<BaseSeries, DataPointInterface> entry : mCurrentSelection.entrySet()) {
+        for (Map.Entry<BaseSeries, CircBuffer<DataPointInterface>.CircBufferIterator> entry : mCurrentSelection.entrySet()) {
             mRectPaint.setColor(entry.getKey().getColor());
-            canvas.drawRect(new RectF(lLeft + mStyles.padding, lTop + mStyles.padding + (i * (mStyles.textSize + mStyles.spacing)), lLeft + mStyles.padding + shapeSize, lTop + mStyles.padding + (i * (mStyles.textSize + mStyles.spacing)) + shapeSize), mRectPaint);
-            canvas.drawText(getTextForSeries(entry.getKey(), entry.getValue()), lLeft + mStyles.padding + shapeSize + mStyles.spacing, lTop + mStyles.padding / 2 + mStyles.textSize + (i * (mStyles.textSize + mStyles.spacing)), mTextPaint);
+            canvas.drawRect(new RectF(lLeft + mStyles.padding, lTop + mStyles.padding
+                    + (i * (mStyles.textSize + mStyles.spacing)), lLeft + mStyles.padding
+                    + shapeSize, lTop + mStyles.padding
+                    + (i * (mStyles.textSize + mStyles.spacing)) + shapeSize), mRectPaint);
+            canvas.drawText(getTextForSeries(entry.getKey(), entry.getValue().peek(0)),
+                    lLeft + mStyles.padding + shapeSize + mStyles.spacing,
+                    lTop + mStyles.padding / 2 + mStyles.textSize
+                            + (i * (mStyles.textSize + mStyles.spacing)), mTextPaint);
             i++;
         }
     }
@@ -393,11 +407,11 @@ public class CursorMode {
         Paint.FontMetrics fm = mTextPaint.getFontMetrics();
         float textHeight = fm.descent - fm.ascent;
 
-        for (Map.Entry<BaseSeries, DataPointInterface> entry : mCurrentSelection.entrySet()) {
+        for (Map.Entry<BaseSeries, CircBuffer<DataPointInterface>.CircBufferIterator> entry : mCurrentSelection.entrySet()) {
             mTextPaint.setColor(entry.getKey().getColor());
 
-            float xInView = mGraphView.getPointXInView(entry.getValue());
-            float yInView = mGraphView.getPointYInView(entry.getValue());
+            float xInView = mGraphView.getPointXInView(entry.getValue().peek(0));
+            float yInView = mGraphView.getPointYInView(entry.getValue().peek(0));
 
             // Keep text inside graph at edges
             String text = mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(mCurrentSelectionX, true);
@@ -421,8 +435,8 @@ public class CursorMode {
 //        float graphHeight = mGraphView.getGraphContentHeight();
 //        float graphWidth = mGraphView.getGraphContentWidth();
 
-        mControlsCenterX = mGraphView.getPointXInView(mPointBeingEdited);
-        mControlsCenterY = mGraphView.getPointYInView(mPointBeingEdited);
+        mControlsCenterX = mGraphView.getPointXInView(mPointBeingEdited.peek(0));
+        mControlsCenterY = mGraphView.getPointYInView(mPointBeingEdited.peek(0));
 
         // Ensure controls remain in graph area
 //        if (mControlsCenterX > graphLeft + graphWidth - mEditParameters.controlBoxWidth / 2 - padding) {
@@ -441,8 +455,8 @@ public class CursorMode {
         Paint arrowPaint = new Paint(mPaintLine);
         float arrowSize = mStyles.textSize / 2;
         float arrowDist = 75.f;
-        float dpX = mGraphView.getPointXInView(mPointBeingEdited);
-        float dpY = mGraphView.getPointYInView(mPointBeingEdited);
+        float dpX = mGraphView.getPointXInView(mPointBeingEdited.peek(0));
+        float dpY = mGraphView.getPointYInView(mPointBeingEdited.peek(0));
 //        float graphHeight = mGraphView.getGraphContentHeight();
         float graphLeft = mGraphView.getGraphContentLeft();
 
@@ -482,7 +496,8 @@ public class CursorMode {
             xLabel = dpX + editDelta.x + mStyles.textSize / 2;
             yLabel = arrowY + mStyles.textSize;
             newValText = mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(
-                    mPointBeingEdited.getX() + editDelta.x * mGraphView.getDataToViewParameters().getInvFactorX(), true);
+                    mPointBeingEdited.peek(0).getX() + editDelta.x
+                            * mGraphView.getDataToViewParameters().getInvFactorX(), true);
             float textWidth = mTextPaint.measureText(newValText);
             if (editDelta.x > 0) {
                 xLabel -= textWidth + 3 * arrowSize;
@@ -504,7 +519,8 @@ public class CursorMode {
                 yLabel = dpY + editDelta.y + textHeight + arrowSize;
             }
             newValText = mGraphView.getGridLabelRenderer().getLabelFormatter().formatLabel(
-                    mPointBeingEdited.getY() + editDelta.y * mGraphView.getDataToViewParameters().getInvFactorY(), true);
+                    mPointBeingEdited.peek(0).getY() + editDelta.y
+                            * mGraphView.getDataToViewParameters().getInvFactorY(), true);
         }
 
         canvas.drawPath(arrowUp, arrowPaint);
@@ -536,15 +552,16 @@ public class CursorMode {
     }
     // endregion
 
-    private Map<BaseSeries, DataPointInterface> findCurrentDataPointsAtX() {
-        Map<BaseSeries, DataPointInterface> toReturn = new HashMap<>();
+    private Map<BaseSeries, CircBuffer<DataPointInterface>.CircBufferIterator> findCurrentDataPointsAtX() {
+        Map<BaseSeries, CircBuffer<DataPointInterface>.CircBufferIterator> toReturn = new HashMap<>();
         for (Series series : mGraphView.getSeries()) {
             if (series instanceof BaseSeries) {
 
-                DataPointInterface p = ((BaseSeries) series).findDataPointAtX(mPosX, mGraphView);
+                CircBuffer<DataPointInterface>.CircBufferIterator p =
+                        ((BaseSeries) series).getIterAtX(mPosX, mGraphView);
                 if (p != null) {
-                    mCurrentSelectionX = p.getX();
-                    mCurrentSelectionY = p.getY();
+                    mCurrentSelectionX = p.peek(0).getX();
+                    mCurrentSelectionY = p.peek(0).getY();
                     toReturn.put((BaseSeries) series, p);
                 }
             }

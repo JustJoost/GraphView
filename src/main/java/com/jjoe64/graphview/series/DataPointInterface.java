@@ -50,29 +50,13 @@ public interface DataPointInterface {
      */
     public void setY(double y);
 
-    public DataPointInterface getNext();
-
-    public DataPointInterface getPrevious();
-
-    public boolean hasNext();
-
-    public boolean hasPrevious();
-
-    public void setNext(DataPointInterface next);
-
-    public void setPrevious(DataPointInterface previous);
-
-    public void insertAfter(DataPointInterface dataPoint);
-
-    public void insertBefore(DataPointInterface dataPoint);
-
-    public void remove();
-
-    public Iterator<DataPointInterface> rangedIterator(double start, double end);
-
+    /**
+     * @param series the series that this data point belongs to
+     */
     public void setSeries(Series series);
 
+    /**
+     * @return the series that this data point belongs to
+     */
     public Series getSeries();
-
-    public int size();
 }
