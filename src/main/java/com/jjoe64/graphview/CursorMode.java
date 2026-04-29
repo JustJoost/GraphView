@@ -473,6 +473,7 @@ public class CursorMode {
         baseArrow.lineTo(arrowSize, arrowSize);
         baseArrow.close();
 
+        // TODO: cache arrowheads with all angles
         Path arrowUp = rotAndTranslate(baseArrow, 0, dpX, dpY - arrowDist);
         Path arrowDown = rotAndTranslate(baseArrow, 180, dpX, dpY + arrowDist);
         Path arrowLeft = rotAndTranslate(baseArrow, 270, dpX - arrowDist, dpY);
@@ -558,7 +559,7 @@ public class CursorMode {
             if (series instanceof BaseSeries) {
 
                 CircBuffer<DataPointInterface>.CircBufferIterator p =
-                        ((BaseSeries) series).getIterAtX(mPosX, mGraphView);
+                        ((BaseSeries) series).getPointClosestToX(mPosX, mGraphView);
                 if (p != null) {
                     mCurrentSelectionX = p.peek(0).getX();
                     mCurrentSelectionY = p.peek(0).getY();

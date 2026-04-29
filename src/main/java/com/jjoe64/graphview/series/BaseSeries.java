@@ -45,6 +45,43 @@ import kotlin.Pair;
  */
 public abstract class BaseSeries<E extends DataPointInterface> implements Series<E> {
     // region Fields and Initialization
+    private class IndexGuesser {
+        double constantFac = 0d;
+        double linearFac = 0d;
+
+        IndexGuesser() {
+            update();
+        }
+
+        int GuessIndex(double x) {
+            if (mData != null) {
+                int index = (int) (linearFac * (x + constantFac) + 0.5);
+                if (index < 0) {
+                    return 0;
+                } else if (index > mData.size() - 1) {
+                    return mData.size() - 1;
+                }
+                return index;
+            } else {
+                return 0;
+            }
+        }
+
+        void update() {
+            if (mData != null && mData.getFromOldest(0) != null) {
+                double xMin = mData.getFromOldest(0).getX();
+                double xMax = mData.getFromNewest(0).getX();
+
+                if (xMin != xMax) {
+                    constantFac = -xMin;
+                    linearFac = (mData.size() - 1) / (xMax - xMin);
+                }
+            }
+        }
+    }
+
+    private IndexGuesser indexGuesser = new IndexGuesser();
+
     CircBuffer<E> mData = new CircBuffer<>(0);
 
     /**
@@ -321,6 +358,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
         float shortestSqDist = Float.NaN;
         int indexClosest = -1;
         CircBuffer<E>.CircBufferIterator iter = mData.iterator();
+
         while (iter.hasNext()) {
             E current = iter.next();
             float xDiff = gv.getPointXInView(current) - x;
@@ -339,19 +377,52 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
         }
     }
 
-    public CircBuffer<E>.CircBufferIterator getIterAtX(float x, GraphView gv) {
-        float shortestDistance = Float.NaN;
-        CircBuffer<E>.CircBufferIterator searchIter = mData.iterator();
-        int indexShortest = -1;
-        while (searchIter.hasNext()) {
-            float xDiff = gv.getPointXInView(searchIter.next()) - x;
+    public CircBuffer<E>.CircBufferIterator getNearestPointSmallerThanX(double x) {
+        CircBuffer<E>.CircBufferIterator it = mData.iterator(indexGuesser.GuessIndex(x));
+
+        if (!it.hasPrevious() && it.hasPrevious()) it.next();
+
+        if (it.peek(0).getX() < x) {
+            while (it.hasNext()) {
+                if (it.next().getX() >= x) {
+                    break;
+                }
+            }
+            if (it.peek(0).getX() >= x) {
+                it.previous();
+            }
+        } else if (it.peek(0).getX() >= x) {
+            while (it.hasPrevious()) {
+                if (it.previous().getX() < x) {
+                    break;
+                }
+            }
+        }
+
+        return it;
+    }
+
+    public CircBuffer<E>.CircBufferIterator getPointClosestToX(float x, GraphView gv) {
+        float shortestDistance = Float.MAX_VALUE;
+        CircBuffer<E>.CircBufferIterator searchIter = getNearestPointSmallerThanX(gv.getViewXinPointUnits(x));
+        int indexShortest = searchIter.previousIndex();
+
+        for (int i = 0; i < 2; i++) {
+            if (!searchIter.hasPrevious()) continue;
+            float xDiff = gv.getPointXInView(searchIter.peek(0)) - x;
 
             float distance = Math.abs(xDiff);
             if (indexShortest == -1 || distance < shortestDistance) {
                 shortestDistance = distance;
                 indexShortest = searchIter.previousIndex();
             }
+            if (searchIter.hasNext()) {
+                searchIter.next();
+            } else {
+                break;
+            }
         }
+
         if (indexShortest != -1) {
             if (shortestDistance < 200) {
                 return mData.iterator(indexShortest);

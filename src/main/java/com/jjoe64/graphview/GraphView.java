@@ -551,6 +551,10 @@ public class GraphView extends View implements Serializable {
         return (float) (dp.getY() * mDataToViewParameters.getFactorY() + mDataToViewParameters.getOffsetY());
     }
 
+    public double getViewXinPointUnits(float x) {
+        return mDataToViewParameters.getInvFactorX() * (x - mDataToViewParameters.getOffsetX());
+    }
+
     public PointF getPointInView(DataPointInterface dp) {
         return new PointF(getPointXInView(dp), getPointYInView(dp));
     }
