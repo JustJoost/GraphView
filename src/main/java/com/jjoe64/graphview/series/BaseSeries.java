@@ -380,8 +380,6 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     public CircBuffer<E>.CircBufferIterator getNearestPointSmallerThanX(double x) {
         CircBuffer<E>.CircBufferIterator it = mData.iterator(indexGuesser.GuessIndex(x));
 
-        if (!it.hasPrevious() && it.hasPrevious()) it.next();
-
         if (it.peek(0).getX() < x) {
             while (it.hasNext()) {
                 if (it.next().getX() >= x) {
@@ -403,6 +401,8 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     }
 
     public CircBuffer<E>.CircBufferIterator getPointClosestToX(float x, GraphView gv) {
+        if (mData.isEmpty()) return null;
+
         float shortestDistance = Float.MAX_VALUE;
         CircBuffer<E>.CircBufferIterator searchIter = getNearestPointSmallerThanX(gv.getViewXinPointUnits(x));
         int indexShortest = searchIter.previousIndex();
