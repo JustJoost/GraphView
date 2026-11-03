@@ -19,11 +19,10 @@ apply plugin: 'com.android.library'
 
 
 android {
-    compileSdk 35
-
+    compileSdkVersion 36
     defaultConfig {
         minSdkVersion 9
-        targetSdkVersion 27
+        targetSdkVersion 36
     }
     buildTypes {
         release {
@@ -37,7 +36,9 @@ android {
 }
 
 dependencies {
-    implementation libs.androidx.core
+    implementation 'androidx.core:core:1.18.0'
+    // TODO: replace by a release version
+    implementation 'com.github.JustJoost:java-collections:master-SNAPSHOT'
 }
 
 

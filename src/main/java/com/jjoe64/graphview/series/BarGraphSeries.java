@@ -18,15 +18,16 @@ package com.jjoe64.graphview.series;
 
 import android.graphics.Canvas;
 import android.graphics.Paint;
-import android.graphics.RectF;
 import androidx.core.view.ViewCompat;
-import android.util.Log;
+import kotlin.Pair;
 import android.view.animation.AccelerateInterpolator;
 
 import com.jjoe64.graphview.GraphView;
 import com.jjoe64.graphview.RectD;
 import com.jjoe64.graphview.ValueDependentColor;
+import com.josoft.collections.CircBuffer;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Map;
@@ -97,7 +98,7 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
      * stores the coordinates of the bars to
      * trigger tap on series events.
      */
-    private Map<RectD, E> mDataPoints = new HashMap<RectD, E>();
+    private ArrayList<RectD> mDataPoints = new ArrayList<>(mData.size());
 
     /**
      * flag for animated rendering
@@ -159,8 +160,6 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
         }
         mPaint.setTextSize(mValuesOnTopSize);
 
-        resetDataPoints();
-        
         // get data
         double maxX = graphView.getViewport().getMaxX(false);
         double minX = graphView.getViewport().getMinX(false);
@@ -329,7 +328,7 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
             bottom = Math.min(bottom, contentTop+contentHeight);
             top = Math.max(top, contentTop);
 
-            mDataPoints.put(new RectD(left, top, right, bottom), value);
+            mDataPoints.add(new RectD(left, top, right, bottom));
 
             Paint p;
             if (mCustomPaint != null) {
@@ -457,14 +456,6 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
     }
 
     /**
-     * resets the cached coordinates of the bars
-     */
-    @Override
-    protected void resetDataPoints() {
-        mDataPoints.clear();
-    }
-
-    /**
      * find the corresponding data point by
      * coordinates.
      *
@@ -473,11 +464,11 @@ public class BarGraphSeries<E extends DataPointInterface> extends BaseSeries<E> 
      * @return datapoint or null
      */
     @Override
-    protected E findDataPoint(float x, float y) {
-        for (Map.Entry<RectD, E> entry : mDataPoints.entrySet()) {
-            if (x >= entry.getKey().left && x <= entry.getKey().right
-                && y >= entry.getKey().top && y <= entry.getKey().bottom) {
-                return entry.getValue();
+    public Pair<CircBuffer<E>.CircBufferIterator, Float> findDataPoint(float x, float y, GraphView gv) {
+        for (int index = 0; index < mData.size(); index++) {
+            if (x >= mDataPoints.get(index).left && x <= mDataPoints.get(index).right
+                && y >= mDataPoints.get(index).top && y <= mDataPoints.get(index).bottom) {
+                return new Pair<>(mData.iterator(index), Float.NaN);
             }
         }
         return null;

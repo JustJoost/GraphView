@@ -1,13 +1,13 @@
 /**
  * GraphView
  * Copyright 2016 Jonas Gehring
- *
+ * <p>
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
  * You may obtain a copy of the License at
- *
+ * <p>
  * http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -17,27 +17,26 @@
 package com.jjoe64.graphview.series;
 
 import android.graphics.Canvas;
-import android.graphics.PointF;
 
 import com.jjoe64.graphview.GraphView;
+import com.josoft.collections.CircBuffer;
 
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
-import java.util.NoSuchElementException;
+import java.util.ListIterator;
+
+import kotlin.Pair;
 
 /**
  * Basis implementation for series.
  * Used for series that are plotted on
  * a default x/y 2d viewport.
- *
+ * <p>
  * Extend this class to implement your own custom
  * graph type.
- *
+ * <p>
  * This implementation uses a internal Array to store
  * the data. If you want to implement a custom data provider
  * you may want to implement {@link com.jjoe64.graphview.series.Series}.
@@ -45,23 +44,48 @@ import java.util.NoSuchElementException;
  * @author jjoe64
  */
 public abstract class BaseSeries<E extends DataPointInterface> implements Series<E> {
-    /**
-     * holds the data
-     */
-    final private List<E> mData = new ArrayList<E>();
+    // region Fields and Initialization
+    private class IndexGuesser {
+        double constantFac = 0d;
+        double linearFac = 0d;
+
+        IndexGuesser() {
+            update();
+        }
+
+        int GuessIndex(double x) {
+            if (mData != null) {
+                int index = (int) (linearFac * (x + constantFac) + 0.5);
+                if (index < 0) {
+                    return 0;
+                } else if (index > mData.size() - 1) {
+                    return mData.size() - 1;
+                }
+                return index;
+            } else {
+                return 0;
+            }
+        }
+
+        void update() {
+            if (mData != null && mData.getFromOldest(0) != null) {
+                double xMin = mData.getFromOldest(0).getX();
+                double xMax = mData.getFromNewest(0).getX();
+
+                if (xMin != xMax) {
+                    constantFac = -xMin;
+                    linearFac = (mData.size() - 1) / (xMax - xMin);
+                }
+            }
+        }
+    }
+
+    private IndexGuesser indexGuesser = new IndexGuesser();
+
+    CircBuffer<E> mData = new CircBuffer<>(0);
 
     /**
-     * stores the used coordinates to find the
-     * corresponding data point on a tap
-     *
-     * Key => x/y pixel
-     * Value => Plotted Datapoint
-     *
-     * will be filled while drawing via {@link #regDataPointLocInView(float, float, DataPointInterface)}
-     */
-    private final Map<PointF, E> mDataPointsLocInView = new HashMap<PointF, E>();
-
-    /**
+     * /**
      * title for this series that can be displayed
      * in the legend.
      */
@@ -79,7 +103,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     private double mLowestYCache = Double.NaN;
 
     /**
-     * cahce for highest y value
+     * cache for highest y value
      */
     private double mHighestYCache = Double.NaN;
 
@@ -94,6 +118,11 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      */
     private final List<WeakReference<GraphView>> mGraphViews;
     private Boolean mIsCursorModeCache;
+    protected boolean mEditable = false;
+    protected double mEditIncrementX = 0f;
+    protected double mEditIncrementY = 0f;
+
+    private boolean mSortNewDatapoints = false;
 
     /**
      * creates series without data
@@ -105,29 +134,44 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     /**
      * creates series with data
      *
-     * @param data  data points
-     *              important: array has to be sorted from lowest x-value to the highest
+     * @param data data points
+     *             important: array has to be sorted from lowest x-value to the highest
      */
     public BaseSeries(E[] data) {
         mGraphViews = new ArrayList<>();
-        mData.addAll(Arrays.asList(data));
-        checkValueOrder(null);
+        mData = new CircBuffer<>(data.length);
+        addAll(data);
     }
+
+    public BaseSeries(E[] data, boolean sort) {
+        mGraphViews = new ArrayList<>();
+        mSortNewDatapoints = sort;
+        addAll(data);
+    }
+    // endregion
+
+    // region Getters and setters
 
     /**
      * @return the lowest x value, or 0 if there is no data
      */
     public double getLowestValueX() {
-        if (mData.isEmpty()) return 0d;
-        return mData.get(0).getX();
+        if (!mData.isEmpty()) {
+            return mData.getFromOldest(0).getX();
+        } else {
+            return 0d;
+        }
     }
 
     /**
      * @return the highest x value, or 0 if there is no data
      */
     public double getHighestValueX() {
-        if (mData.isEmpty()) return 0d;
-        return mData.get(mData.size()-1).getX();
+        if (!mData.isEmpty()) {
+            return mData.getFromNewest(0).getX();
+        } else {
+            return 0d;
+        }
     }
 
     /**
@@ -138,9 +182,10 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
         if (!Double.isNaN(mLowestYCache)) {
             return mLowestYCache;
         }
-        double l = mData.get(0).getY();
-        for (int i = 1; i < mData.size(); i++) {
-            double c = mData.get(i).getY();
+        ListIterator<E> iter = mData.iterator();
+        double l = Double.MAX_VALUE;
+        while (iter.hasNext()) {
+            double c = iter.next().getY();
             if (l > c) {
                 l = c;
             }
@@ -156,9 +201,10 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
         if (!Double.isNaN(mHighestYCache)) {
             return mHighestYCache;
         }
-        double h = mData.get(0).getY();
-        for (int i = 1; i < mData.size(); i++) {
-            double c = mData.get(i).getY();
+        ListIterator<E> iter = mData.iterator();
+        double h = Double.MIN_VALUE;
+        while (iter.hasNext()) {
+            double c = iter.next().getY();
             if (h < c) {
                 h = c;
             }
@@ -172,76 +218,46 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      * If it is only a part of the data, the range is returned plus one datapoint
      * before and after to get a nice scrolling.
      *
-     * @param from minimal x-value
+     * @param from  minimal x-value
      * @param until maximal x-value
      * @return data for the range +/- 1 datapoint
      */
     @Override
     public Iterator<E> getValues(final double from, final double until) {
-        if (from <= getLowestValueX() && until >= getHighestValueX()) {
-            return mData.iterator();
-        } else {
+        if (mData.isEmpty()) {
+            // No data yet, 'fool' requester with empty iterator
             return new Iterator<E>() {
-                final Iterator<E> org = mData.iterator();
-                E nextValue = null;
-                E nextNextValue = null;
-                boolean plusOne = true;
-
-                {
-                    // go to first
-                    boolean found = false;
-                    E prevValue = null;
-                    if (org.hasNext()) {
-                        prevValue = org.next();
-                    }
-                    if (prevValue != null) {
-                        if (prevValue.getX() >= from) {
-                            nextValue = prevValue;
-                            found = true;
-                        } else {
-                            while (org.hasNext()) {
-                                nextValue = org.next();
-                                if (nextValue.getX() >= from) {
-                                    found = true;
-                                    nextNextValue = nextValue;
-                                    nextValue = prevValue;
-                                    break;
-                                }
-                                prevValue = nextValue;
-                            }
-                        }
-                    }
-                    if (!found) {
-                        nextValue = null;
-                    }
-                }
-
                 @Override
-                public void remove() {
-                    throw new UnsupportedOperationException();
+                public boolean hasNext() {
+                    return false;
                 }
 
                 @Override
                 public E next() {
-                    if (hasNext()) {
-                        E r = nextValue;
-                        if (r.getX() > until) {
-                            plusOne = false;
-                        }
-                        if (nextNextValue != null) {
-                            nextValue = nextNextValue;
-                            nextNextValue = null;
-                        } else if (org.hasNext()) nextValue = org.next();
-                        else nextValue = null;
-                        return r;
-                    } else {
-                        throw new NoSuchElementException();
-                    }
+                    return null;
                 }
-
+            };
+        } else {
+            return mData.new CircBufferIterator(mData) {
                 @Override
                 public boolean hasNext() {
-                    return nextValue != null && (nextValue.getX() <= until || plusOne);
+                    if (peek(2) != null && peek(2).getX() < from) {
+                        while (super.hasNext()) {
+                            if (super.next().getX() >= from) {
+                                break;
+                            }
+                        }
+                        if (super.hasNext()) {
+                            for (int i = 0; i < 2; i++) {
+                                super.previous();
+                            }
+                        }
+                    }
+                    if (peek(0) == null || peek(0).getX() <= until) {
+                        return super.hasNext();
+                    } else {
+                        return false;
+                    }
                 }
             };
         }
@@ -287,9 +303,31 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      *
      * @param l listener
      */
+    @Override
     public void setOnDataPointTapListener(OnDataPointTapListener l) {
         this.mOnDataPointTapListener = l;
     }
+
+    @Override
+    public double getEditIncrementX() {
+        return mEditIncrementX;
+    }
+
+    @Override
+    public void setEditIncrementX(double mEditIncrementX) {
+        this.mEditIncrementX = mEditIncrementX;
+    }
+
+    @Override
+    public double getEditIncrementY() {
+        return mEditIncrementY;
+    }
+
+    @Override
+    public void setEditIncrementY(double mEditIncrementY) {
+        this.mEditIncrementY = mEditIncrementY;
+    }
+    // endregion
 
     /**
      * called by the tap detector in order to trigger
@@ -299,12 +337,11 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      * @param y pixel
      */
     @Override
-    public void onTap(float x, float y) {
-        if (mOnDataPointTapListener != null) {
-            E p = findDataPoint(x, y);
-            if (p != null) {
-                mOnDataPointTapListener.onTap(this, p);
-            }
+    public void onTap(float x, float y, GraphView gv) {
+        CircBuffer<E>.CircBufferIterator it = findDataPoint(x, y, gv).getFirst();
+        if (it != null) {
+            E p = findDataPoint(x, y, gv).getFirst().previous();
+            if (mOnDataPointTapListener != null) mOnDataPointTapListener.onTap(this, p);
         }
     }
 
@@ -314,62 +351,84 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      *
      * @param x pixel
      * @param y pixel
-     * @return the data point or null if nothing was found
+     * @return Triple of the data point or null if nothing was found, the index of the datapoint,
+     * and the squared distance to the coordinates of this data point
      */
-    protected E findDataPoint(float x, float y) {
-        float shortestDistance = Float.NaN;
-        E shortest = null;
-        for (Map.Entry<PointF, E> entry : mDataPointsLocInView.entrySet()) {
-            float xDiff = entry.getKey().x - x;
-            float yDiff = entry.getKey().y - y;
+    public Pair<CircBuffer<E>.CircBufferIterator, Float> findDataPoint(float x, float y, GraphView gv) {
+        float shortestSqDist = Float.NaN;
+        int indexClosest = -1;
+        CircBuffer<E>.CircBufferIterator iter = mData.iterator();
 
-            float distance = (float) Math.sqrt(xDiff*xDiff + yDiff*yDiff);
-            if (shortest == null || distance < shortestDistance) {
-                shortestDistance = distance;
-                shortest = entry.getValue();
+        while (iter.hasNext()) {
+            E current = iter.next();
+            float xDiff = gv.getPointXInView(current) - x;
+            float yDiff = gv.getPointYInView(current) - y;
+
+            float distance = xDiff * xDiff + yDiff * yDiff;
+            if (indexClosest == -1 || distance < shortestSqDist) {
+                shortestSqDist = distance;
+                indexClosest = iter.previousIndex();
             }
         }
-        if (shortest != null) {
-            if (shortestDistance < 120) {
-                return shortest;
-            }
+        if (indexClosest != -1 && shortestSqDist < 120 * 120) {
+            return new Pair<>(mData.iterator(indexClosest), shortestSqDist);
+        } else {
+            return new Pair<>(null, Float.NaN);
         }
-        return null;
     }
 
-    public E findDataPointAtX(float x) {
-        float shortestDistance = Float.NaN;
-        E shortest = null;
-        for (Map.Entry<PointF, E> entry : mDataPointsLocInView.entrySet()) {
-            float xDiff = entry.getKey().x - x;
+    public CircBuffer<E>.CircBufferIterator getNearestPointSmallerThanX(double x) {
+        CircBuffer<E>.CircBufferIterator it = mData.iterator(indexGuesser.GuessIndex(x));
+
+        if (it.peek(0).getX() < x) {
+            while (it.hasNext()) {
+                if (it.next().getX() >= x) {
+                    break;
+                }
+            }
+            if (it.peek(0).getX() >= x) {
+                it.previous();
+            }
+        } else if (it.peek(0).getX() >= x) {
+            while (it.hasPrevious()) {
+                if (it.previous().getX() < x) {
+                    break;
+                }
+            }
+        }
+
+        return it;
+    }
+
+    public CircBuffer<E>.CircBufferIterator getPointClosestToX(float x, GraphView gv) {
+        if (mData.isEmpty()) return null;
+
+        float shortestDistance = Float.MAX_VALUE;
+        CircBuffer<E>.CircBufferIterator searchIter = getNearestPointSmallerThanX(gv.getViewXinPointUnits(x));
+        int indexShortest = searchIter.previousIndex();
+
+        for (int i = 0; i < 2; i++) {
+            if (!searchIter.hasPrevious()) continue;
+            float xDiff = gv.getPointXInView(searchIter.peek(0)) - x;
 
             float distance = Math.abs(xDiff);
-            if (shortest == null || distance < shortestDistance) {
+            if (indexShortest == -1 || distance < shortestDistance) {
                 shortestDistance = distance;
-                shortest = entry.getValue();
+                indexShortest = searchIter.previousIndex();
+            }
+            if (searchIter.hasNext()) {
+                searchIter.next();
+            } else {
+                break;
             }
         }
-        if (shortest != null) {
+
+        if (indexShortest != -1) {
             if (shortestDistance < 200) {
-                return shortest;
+                return mData.iterator(indexShortest);
             }
         }
         return null;
-    }
-
-    /**
-     * register the datapoint to find it at a tap
-     *
-     * @param x pixel
-     * @param y pixel
-     * @param dp the data point to save
-     */
-    protected void regDataPointLocInView(float x, float y, E dp) {
-        // performance
-        // TODO maybe invalidate after setting the listener
-        if (mOnDataPointTapListener != null || isCursorMode()) {
-            mDataPointsLocInView.put(new PointF(x, y), dp);
-        }
     }
 
     private boolean isCursorMode() {
@@ -385,11 +444,16 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     }
 
     /**
-     * clears the cached data point coordinates
+     * stores the reference of the used graph
+     *
+     * @param graphView graphview
      */
-    protected void resetDataPoints() {
-        mDataPointsLocInView.clear();
+    @Override
+    public void onGraphViewAttached(GraphView graphView) {
+        mGraphViews.add(new WeakReference<>(graphView));
     }
+
+    // region Data manipulation
 
     /**
      * clears the data of this series and sets new.
@@ -400,10 +464,7 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
      */
     public void resetData(E[] data) {
         mData.clear();
-        mData.addAll(Arrays.asList(data));
-        checkValueOrder(null);
-
-        mHighestYCache = mLowestYCache = Double.NaN;
+        addAll(data);
 
         // update graphview
         for (WeakReference<GraphView> gv : mGraphViews) {
@@ -414,54 +475,38 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     }
 
     /**
-     * stores the reference of the used graph
      *
-     * @param graphView graphview
-     */
-    @Override
-    public void onGraphViewAttached(GraphView graphView) {
-        mGraphViews.add(new WeakReference<>(graphView));
-    }
-
-    /**
-     *
-     * @param dataPoint values the values must be in the correct order!
-     *                  x-value has to be ASC. First the lowest x value and at least the highest x value.
-     * @param scrollToEnd true => graphview will scroll to the end (maxX)
+     * @param dataPoint     values the values must be in the correct order!
+     *                      x-value has to be ASC. First the lowest x value and at least the highest x value.
+     * @param scrollToEnd   true => graphview will scroll to the end (maxX)
      * @param maxDataPoints if max data count is reached, the oldest data
      *                      value will be lost to avoid memory leaks
-     * @param silent    set true to avoid rerender the graph
+     * @param silent        set true to avoid rerender the graph
      */
     public void appendData(E dataPoint, boolean scrollToEnd, int maxDataPoints, boolean silent) {
-        checkValueOrder(dataPoint);
-
-        if (!mData.isEmpty() && dataPoint.getX() < mData.get(mData.size()-1).getX()) {
-            throw new IllegalArgumentException("new x-value must be greater then the last value. x-values has to be ordered in ASC.");
+        if (!mData.isEmpty()) {
+            if (dataPoint.getX() < mData.getFromNewest(0).getX() && !mSortNewDatapoints) {
+                throw new IllegalArgumentException("new x-value must be greater then the last value. x-values has to be ordered in ASC.");
+            } else if (dataPoint.getX() < mData.getFromNewest(0).getX()) {
+                addSorted(dataPoint);
+            }
+        } else {
+            mData = new CircBuffer<>(maxDataPoints);
         }
-        synchronized (mData) {
-            int curDataCount = mData.size();
-            if (curDataCount < maxDataPoints) {
-                // enough space
-                mData.add(dataPoint);
-            } else {
-                // we have to trim one data
-                mData.remove(0);
-                mData.add(dataPoint);
-            }
+        dataPoint.setSeries(this);
+        mData.add(dataPoint);
 
-            // update lowest/highest cache
-            double dataPointY = dataPoint.getY();
-            if (!Double.isNaN(mHighestYCache)) {
-                if (dataPointY > mHighestYCache) {
-                    mHighestYCache = dataPointY;
-                }
+        // update lowest/highest cache
+        double dataPointY = dataPoint.getY();
+        if (!Double.isNaN(mHighestYCache)) {
+            if (dataPointY > mHighestYCache) {
+                mHighestYCache = dataPointY;
             }
-            if (!Double.isNaN(mLowestYCache)) {
-                if (dataPointY < mLowestYCache) {
-                    mLowestYCache = dataPointY;
-                }
+        }
+        if (!Double.isNaN(mLowestYCache)) {
+            if (dataPointY < mLowestYCache) {
+                mLowestYCache = dataPointY;
             }
-
         }
 
         if (!silent) {
@@ -484,14 +529,46 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
 
     /**
      *
-     * @param dataPoint values the values must be in the correct order!
-     *                  x-value has to be ASC. First the lowest x value and at least the highest x value.
-     * @param scrollToEnd true => graphview will scroll to the end (maxX)
+     * @param dataPoint     values the values must be in the correct order!
+     *                      x-value has to be ASC. First the lowest x value and at least the highest x value.
+     * @param scrollToEnd   true => graphview will scroll to the end (maxX)
      * @param maxDataPoints if max data count is reached, the oldest data
      *                      value will be lost to avoid memory leaks
      */
     public void appendData(E dataPoint, boolean scrollToEnd, int maxDataPoints) {
         appendData(dataPoint, scrollToEnd, maxDataPoints, false);
+    }
+
+    private void addAll(E[] data) {
+        for (E dp : data) {
+            if (Double.isNaN(mLowestYCache) || dp.getY() < mLowestYCache) {
+                mLowestYCache = dp.getY();
+            }
+            if (Double.isNaN(mHighestYCache) || dp.getY() > mHighestYCache) {
+                mHighestYCache = dp.getY();
+            }
+
+            if (dp.getX() < mData.getFromNewest(0).getX() && !mSortNewDatapoints) {
+                throw new IllegalArgumentException("Data not sorted on x-value, automatic sort not enabled");
+            } else if (mSortNewDatapoints) {
+                addSorted(dp);
+            } else {
+                dp.setSeries(this);
+                mData.add(dp);
+            }
+        }
+    }
+
+    private void addSorted(E dataPointToAdd) {
+        dataPointToAdd.setSeries(this);
+        CircBuffer<E>.CircBufferIterator iter = mData.iterator(mData.size() - 1);
+        while (iter.hasPrevious()) {
+            E current = (E) iter.previous();
+            if (current.getX() < dataPointToAdd.getX()) {
+                break;
+            }
+        }
+        iter.add(dataPointToAdd);
     }
 
     /**
@@ -503,34 +580,26 @@ public abstract class BaseSeries<E extends DataPointInterface> implements Series
     }
 
     /**
-     * checks that the data is in the correct order
-     *
-     * @param onlyLast  if not null, it will only check that this
-     *                  datapoint is after the last point.
+     * @return whether the series is editable
      */
-    protected void checkValueOrder(DataPointInterface onlyLast) {
-        if (mData.size()>1) {
-            if (onlyLast != null) {
-                // only check last
-                if (onlyLast.getX() < mData.get(mData.size()-1).getX()) {
-                    throw new IllegalArgumentException("new x-value must be greater then the last value. x-values has to be ordered in ASC.");
-                }
-            } else {
-                double lx = mData.get(0).getX();
-
-                for (int i = 1; i < mData.size(); i++) {
-                    if (!Double.isNaN(mData.get(i).getX())) {
-                        if (lx > mData.get(i).getX()) {
-                            throw new IllegalArgumentException("The order of the values is not correct. X-Values have to be ordered ASC. First the lowest x value and at least the highest x value.");
-                        }
-                        lx = mData.get(i).getX();
-                    }
-                }
-            }
-        }
+    @Override
+    public boolean isEditable() {
+        return mEditable;
     }
 
-    public abstract void drawSelection(GraphView mGraphView, Canvas canvas, boolean b, DataPointInterface value);
+    /**
+     * set whether the series is editable
+     *
+     * @param editable
+     */
+    @Override
+    public void setEditable(boolean editable) {
+        mEditable = editable;
+    }
+    // endregion
+
+    public abstract void drawSelection(GraphView mGraphView, Canvas canvas,
+                                       boolean b, DataPointInterface value);
 
     public void clearCursorModeCache() {
         mIsCursorModeCache = null;

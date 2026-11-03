@@ -106,7 +106,7 @@ public interface Series<E extends DataPointInterface> {
      * @param x pixel
      * @param y pixel
      */
-    void onTap(float x, float y);
+    void onTap(float x, float y, GraphView gv);
 
     /**
      * called when the series was added to a graph
@@ -119,6 +119,26 @@ public interface Series<E extends DataPointInterface> {
      * @return whether there are data points
      */
     boolean isEmpty();
+
+    /**
+     * @return whether the series is editable
+     */
+    boolean isEditable();
+
+    /**
+     * set whether the series is editable
+     *
+     * @param editable
+     */
+    void setEditable(boolean editable);
+
+    public double getEditIncrementX();
+
+    public void setEditIncrementX(double mEditIncrementX);
+
+    public double getEditIncrementY();
+
+    public void setEditIncrementY(double mEditIncrementY);
 
     /**
      * clear reference to view and activity
